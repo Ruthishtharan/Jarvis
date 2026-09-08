@@ -1,0 +1,23 @@
+groq>=0.9.0
+SpeechRecognition>=3.10.0
+pyaudio>=0.2.14
+openai-whisper>=20231117
+python-dotenv>=1.0.0
+requests>=2.31.0
+duckduckgo-search>=6.1.0
+
+# ── Ported from GauravSingh9356/J.A.R.V.I.S feature set ──────────────────────
+psutil>=5.9.0        # system_stats skill — CPU / RAM / disk
+pyjokes>=0.6.0       # jokes skill
+
+# Deliberately NOT included:
+#   wikipedia        — unmaintained since 2014, sets no request timeout, hangs
+#                      forever and starves the shared thread pool. The
+#                      wikipedia_lookup skill calls the Wikipedia REST API
+#                      directly via `requests` instead.
+#   newsapi          — the upstream project shipped `apiKey=yourapikey`, and
+#                      NewsAPI's free tier is localhost-only. news_headlines
+#                      reads Google News RSS with the stdlib XML parser: no
+#                      key, no signup, no extra dependency.
+#   pyttsx3          — this project uses native macOS `say` via voice/text_to_speech.py
+#   pywin32/pypiwin32/comtypes — Windows-only, not installable on macOS

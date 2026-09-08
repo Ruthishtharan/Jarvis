@@ -1,0 +1,183 @@
+/* ============================================================
+   Dashboard — reactor centerpiece + telemetry grid
+   ============================================================ */
+
+.dash {
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
+  padding-bottom: 10px;
+}
+
+/* ── Reactor row ───────────────────────────────────────── */
+
+.dash-reactor-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 44px;
+  padding: 14px 0 30px;
+  position: relative;
+}
+
+/* Horizon line behind the reactor */
+.dash-reactor-row::before {
+  content: '';
+  position: absolute;
+  top: 47%;
+  left: 4%;
+  right: 4%;
+  height: 1px;
+  background: linear-gradient(90deg,
+    transparent,
+    var(--hud-cyan-line) 22%,
+    var(--hud-cyan-line) 78%,
+    transparent);
+  opacity: 0.5;
+}
+
+.dash-gauges {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  position: relative;
+  z-index: 1;
+}
+
+.dash-gauges.left  { align-items: flex-end; }
+.dash-gauges.right { align-items: flex-start; }
+
+/* ── Lower grid ────────────────────────────────────────── */
+
+.dash-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
+  gap: 18px;
+}
+
+/* System array list */
+.sys-list {
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Command deck ──────────────────────────────────────── */
+
+.deck {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 9px;
+}
+
+.deck .hud-btn {
+  justify-content: center;
+  font-size: 9px;
+  padding: 10px 8px;
+}
+
+.deck-note {
+  margin-top: 16px;
+  padding-top: 13px;
+  border-top: 1px dotted rgba(79, 227, 255, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.deck-wake {
+  font-size: 13px;
+  letter-spacing: 0.24em;
+  color: var(--hud-cyan-bright);
+}
+
+/* ── Power bars ────────────────────────────────────────── */
+
+.bars {
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+}
+
+.bar-row {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  font-size: 9px;
+}
+
+.bar-name {
+  width: 92px;
+  flex-shrink: 0;
+  color: var(--hud-cyan-dim);
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+.bar-track {
+  flex: 1;
+  height: 5px;
+  background: rgba(79, 227, 255, 0.08);
+  border: 1px solid rgba(79, 227, 255, 0.14);
+  overflow: hidden;
+}
+
+.bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--hud-cyan-dim), var(--hud-cyan));
+  box-shadow: 0 0 9px var(--hud-cyan);
+  transition: width 0.9s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.bar-pct {
+  width: 32px;
+  text-align: right;
+  color: var(--hud-cyan-bright);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+/* ── Responsive ────────────────────────────────────────── */
+
+@media (max-width: 1240px) {
+  .dash-reactor-row { gap: 24px; }
+  .arc-reactor { width: 280px; height: 280px; }
+}
+
+@media (max-width: 980px) {
+  .dash-reactor-row { flex-direction: column; }
+  .dash-reactor-row::before { display: none; }
+  .dash-gauges { flex-direction: row; }
+  .dash-gauges.left, .dash-gauges.right { align-items: center; }
+}
+
+/* ── Particle core ───────────────────────────────────────── */
+
+.dash-core {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  z-index: 1;
+}
+
+.dash-core-readout {
+  margin-top: -34px;   /* tuck under the torus */
+  text-align: center;
+  pointer-events: none;
+}
+
+.dash-core-label {
+  font-size: 12px;
+  letter-spacing: 0.34em;
+  text-transform: uppercase;
+  color: var(--hud-cyan-bright);
+}
+
+.dash-core-sub {
+  margin-top: 6px;
+  font-size: 9px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--hud-cyan-dim);
+  max-width: 340px;
+}

@@ -1,0 +1,258 @@
+/* ============================================================
+   HUD primitives — panels, gauges, pips, buttons
+   ============================================================ */
+
+/* ── HUDPanel ──────────────────────────────────────────── */
+
+.hud-panel {
+  position: relative;
+  background:
+    linear-gradient(180deg,
+      rgba(12, 38, 58, 0.42) 0%,
+      rgba(4, 16, 28, 0.30) 100%);
+  border: 1px solid var(--hud-panel-edge);
+  /* Clipped corners — angular, not rounded */
+  clip-path: polygon(
+    0 0,
+    calc(100% - 16px) 0,
+    100% 16px,
+    100% 100%,
+    16px 100%,
+    0 calc(100% - 16px)
+  );
+  padding: 16px 18px;
+  backdrop-filter: blur(3px);
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.hud-panel:hover {
+  border-color: rgba(79, 227, 255, 0.5);
+  box-shadow: inset 0 0 30px rgba(79, 227, 255, 0.05);
+}
+
+.hud-panel[data-accent='amber'] { border-color: rgba(255, 182, 74, 0.32); }
+.hud-panel[data-accent='red']   { border-color: rgba(255, 77, 94, 0.32); }
+
+/* Corner brackets */
+.hud-panel .bracket {
+  position: absolute;
+  width: 11px;
+  height: 11px;
+  border-color: var(--hud-cyan);
+  opacity: 0.85;
+  pointer-events: none;
+}
+.hud-panel .bracket.tl { top: -1px; left: -1px;  border-top: 2px solid; border-left: 2px solid; }
+.hud-panel .bracket.tr { top: -1px; right: -1px; border-top: 2px solid; border-right: 2px solid; opacity: 0; }
+.hud-panel .bracket.bl { bottom: -1px; left: -1px;  border-bottom: 2px solid; border-left: 2px solid; opacity: 0; }
+.hud-panel .bracket.br { bottom: -1px; right: -1px; border-bottom: 2px solid; border-right: 2px solid; }
+
+/* Panel header */
+.hud-panel-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.hud-panel-title {
+  font-size: 9px;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--hud-cyan);
+  text-shadow: var(--glow-sm);
+  white-space: nowrap;
+}
+
+.hud-panel-rule {
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg,
+    var(--hud-cyan-line),
+    rgba(79, 227, 255, 0.04));
+}
+
+.hud-panel-right {
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  color: var(--hud-cyan-dim);
+  white-space: nowrap;
+}
+
+/* ── CircularGauge ─────────────────────────────────────── */
+
+.gauge {
+  position: relative;
+  color: var(--hud-cyan);
+  flex-shrink: 0;
+}
+
+.gauge.accent-amber { color: var(--hud-amber); }
+.gauge.accent-red   { color: var(--hud-red); }
+.gauge.accent-green { color: var(--hud-green); }
+
+.gauge svg {
+  width: 100%;
+  height: 100%;
+  filter: drop-shadow(0 0 5px currentColor);
+}
+
+.gauge-arc {
+  transition: stroke-dashoffset 0.7s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.gauge-center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.gauge-value {
+  font-size: 24px;
+  font-weight: 300;
+  color: currentColor;
+  text-shadow: 0 0 12px currentColor;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.gauge-unit {
+  font-size: 10px;
+  margin-left: 2px;
+  opacity: 0.65;
+}
+
+.gauge-label {
+  margin-top: 7px;
+  font-size: 8px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--hud-cyan-dim);
+}
+
+/* ── StatusPip ─────────────────────────────────────────── */
+
+.pip-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+.pip {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.pip-running  .pip { background: var(--hud-green); box-shadow: 0 0 9px var(--hud-green); animation: hud-pulse 1.8s infinite; }
+.pip-running  .pip-text { color: var(--hud-green); }
+
+.pip-stopped  .pip { background: #34505f; }
+.pip-stopped  .pip-text { color: #5b7c8c; }
+
+.pip-error    .pip { background: var(--hud-red); box-shadow: 0 0 9px var(--hud-red); animation: hud-pulse 0.9s infinite; }
+.pip-error    .pip-text { color: var(--hud-red); }
+
+.pip-unknown  .pip { background: var(--hud-amber); box-shadow: 0 0 9px var(--hud-amber); animation: hud-pulse 1.2s infinite; }
+.pip-unknown  .pip-text { color: var(--hud-amber); }
+
+/* ── HUDButton ─────────────────────────────────────────── */
+
+.hud-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  background: rgba(79, 227, 255, 0.05);
+  border: 1px solid var(--hud-cyan-line);
+  color: var(--hud-cyan);
+  font-family: var(--hud-font);
+  font-size: 10px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  padding: 9px 16px;
+  cursor: pointer;
+  clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
+  transition: all 0.22s ease;
+}
+
+.hud-btn:hover:not(:disabled) {
+  background: rgba(79, 227, 255, 0.14);
+  border-color: var(--hud-cyan);
+  color: var(--hud-cyan-bright);
+  text-shadow: var(--glow-sm);
+  box-shadow: 0 0 18px rgba(79, 227, 255, 0.2);
+}
+
+.hud-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+.hud-btn-edge {
+  width: 2px;
+  height: 11px;
+  background: currentColor;
+  opacity: 0.55;
+}
+
+.hud-btn-danger {
+  border-color: rgba(255, 77, 94, 0.4);
+  color: var(--hud-red);
+  background: rgba(255, 77, 94, 0.06);
+}
+.hud-btn-danger:hover:not(:disabled) {
+  background: rgba(255, 77, 94, 0.15);
+  border-color: var(--hud-red);
+  color: #ff9aa4;
+  box-shadow: 0 0 18px rgba(255, 77, 94, 0.22);
+}
+
+.hud-btn-go {
+  border-color: rgba(77, 255, 166, 0.4);
+  color: var(--hud-green);
+  background: rgba(77, 255, 166, 0.06);
+}
+.hud-btn-go:hover:not(:disabled) {
+  background: rgba(77, 255, 166, 0.15);
+  border-color: var(--hud-green);
+  box-shadow: 0 0 18px rgba(77, 255, 166, 0.22);
+}
+
+/* ── DataRow ───────────────────────────────────────────── */
+
+.data-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 5px 0;
+  font-size: 10px;
+}
+
+.data-k {
+  color: var(--hud-cyan-dim);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.data-dots {
+  flex: 1;
+  border-bottom: 1px dotted rgba(79, 227, 255, 0.2);
+  transform: translateY(-3px);
+}
+
+.data-v {
+  color: var(--hud-cyan-bright);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.data-v[data-accent='amber'] { color: var(--hud-amber); }
+.data-v[data-accent='red']   { color: var(--hud-red); }
+.data-v[data-accent='green'] { color: var(--hud-green); }

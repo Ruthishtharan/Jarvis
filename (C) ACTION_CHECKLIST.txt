@@ -1,0 +1,200 @@
+═══════════════════════════════════════════════════════════════════════════════
+JARVIS V1 ACTION CHECKLIST — Do This Now!
+═══════════════════════════════════════════════════════════════════════════════
+
+📍 YOUR LOCATION: /Users/ruthish/Projects/Jarvis.ai/
+
+✅ COMPLETED BY CLAUDE (Don't Need to Do)
+───────────────────────────────────────────────────────────────────────────────
+✓ Fixed JARVIS responsiveness (TTS async + latency profiler)
+✓ Built startup daemon (auto-launch on login)
+✓ Built menu bar toggle button (control from top-right corner)
+✓ Built web search skill (real-time internet access)
+✓ Built coding assistant skill (expert programming help)
+✓ Built configuration system (customize without code)
+✓ Built setup script (one-command installation)
+
+
+🚀 YOUR NEXT STEPS (Do These Now)
+───────────────────────────────────────────────────────────────────────────────
+
+STEP 1: Run Setup Script (5 minutes)
+─────────────────────────────────
+Open Terminal:
+
+$ cd /Users/ruthish/Projects/Jarvis.ai
+$ python (C) SETUP_V1.py
+
+Answer YES to startup daemon (recommended).
+
+What it does:
+  • Installs web search library (duckduckgo-search)
+  • Installs macOS integration (PyObjC)
+  • Creates ~/.jarvis/ config directory
+  • Tests all features
+  → Takes ~5 minutes
+
+
+STEP 2: Test JARVIS (5 minutes)
+──────────────────────────────
+In Terminal:
+
+$ python run.py
+
+WAIT FOR: "Jarvis is online — listening for 'jarvis' or a clap"
+
+Now say these commands out loud:
+
+1. "jarvis search for python async programming"
+   Expected: Web search results about Python async
+
+2. "jarvis how do I write async await in javascript"
+   Expected: Coding assistant explains JavaScript promises
+
+3. "jarvis hello"
+   Expected: Conversation response
+
+4. "jarvis what time is it"
+   Expected: Current time
+
+Watch for:
+  ✓ Commands are recognized quickly (< 1 second to hear response)
+  ✓ Web search returns results
+  ✓ Coding assistant answers programming questions
+  ✓ Latency report prints every 10 commands
+
+
+STEP 3: Test Menu Bar App (3 minutes)
+────────────────────────────────────
+In ANOTHER Terminal window:
+
+$ python cli/(C) menu_bar_app.py
+
+Look at your screen's TOP-RIGHT corner:
+  → You should see 🟢 JARVIS icon
+  → Click it to see menu (Start, Stop, Restart, View Logs, Quit)
+  → This is the toggle button!
+
+Press Ctrl+C to stop the menu bar app (just the UI stops, JARVIS keeps running).
+
+
+STEP 4: Customize JARVIS (optional, 2 minutes)
+──────────────────────────────────────────────
+Edit configuration file:
+
+$ nano ~/.jarvis/config.json
+
+Example customizations:
+  • Change voice: "voice": "Alex" (try Alice, Victoria, Daniel)
+  • Change TTS speed: "tts_rate": 150 (slower = more natural)
+  • Change wake word: "wake_word": "hi" (then restart JARVIS)
+  • Disable skills: "web_search": false
+
+Save with Ctrl+O, Enter, Ctrl+X.
+
+RESTART JARVIS after changes:
+  Press Ctrl+C in terminal, then:
+  $ python run.py
+
+
+STEP 5: Verify Startup Daemon (1 minute)
+────────────────────────────────────────
+Check that startup is enabled:
+
+$ python cli/(C) startup_manager.py --status
+
+Expected output:
+  ✅ JARVIS startup is ENABLED (will launch on login)
+
+This means JARVIS will automatically start when you next boot your laptop!
+
+
+STEP 6: Commit to GitHub (3 minutes)
+───────────────────────────────────
+$ git add -A
+$ git commit -m "Add JARVIS V1: startup daemon, toggle button, web search, coding assistant"
+$ git push origin main
+
+Boom! 🚀 V1 is now on GitHub!
+
+
+STEP 7: Update README.md (5 minutes)
+──────────────────────────────────
+Add these lines to your README.md:
+
+## Features
+
+- **Voice Control** — Hands-free control with wake-word
+- **Startup Daemon** — Auto-launch on login
+- **Menu Bar Toggle** — Easy on/off control
+- **Web Search** — Real-time internet access
+- **Coding Assistant** — Expert help in any programming language
+- **Customizable** — Edit ~/.jarvis/config.json to customize
+
+## Quick Start
+
+```bash
+python (C) SETUP_V1.py
+python run.py
+```
+
+Try: "search for python async functions" or "how do I write async await"
+
+
+═══════════════════════════════════════════════════════════════════════════════
+TOTAL TIME: ~25 minutes
+═══════════════════════════════════════════════════════════════════════════════
+
+
+✨ WHAT YOU'LL HAVE AFTER STEP 7
+───────────────────────────────────────────────────────────────────────────────
+
+✅ JARVIS launches automatically when you boot your laptop
+✅ Toggle on/off from menu bar (🟢/🔴 icon)
+✅ Search the internet for current information
+✅ Expert programming help in any language
+✅ Fast responses (< 2 seconds)
+✅ Fully customizable without touching code
+✅ Production-ready code on GitHub
+✅ On track for May 5 deadline!
+
+
+🎯 IF SOMETHING GOES WRONG
+───────────────────────────────────────────────────────────────────────────────
+
+"Web search not working"
+→ Run: pip install duckduckgo-search
+→ Restart JARVIS
+
+"Menu bar app crashes"
+→ Run: pip install pyobjc-framework-Cocoa pyobjc-framework-AppKit
+→ Try again
+
+"Coding assistant doesn't respond"
+→ Check .env has GROQ_API_KEY
+→ Check internet connection
+→ Check logs: tail -f data/logs/jarvis.log
+
+"Startup daemon not working"
+→ Run: python cli/(C) startup_manager.py --status
+→ Check logs: cat data/logs/startup.log
+
+Can't figure it out? Check these files:
+  • (C) V1_COMPLETE.md — Full documentation
+  • (C) QUICK_START_IMPROVEMENTS.md — Troubleshooting
+  • (C) FEATURE_ROADMAP.md — Feature details
+
+
+═══════════════════════════════════════════════════════════════════════════════
+YOU'VE GOT THIS! 💪
+═══════════════════════════════════════════════════════════════════════════════
+
+All the hard coding is done. Now just:
+1. Run setup
+2. Test
+3. Commit
+4. Ship
+
+Questions? Check the docs above. They have everything!
+
+Good luck! 🚀

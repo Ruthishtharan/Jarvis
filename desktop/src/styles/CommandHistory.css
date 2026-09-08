@@ -1,0 +1,180 @@
+/* ============================================================
+   Command History — comms log, HUD language
+   ============================================================ */
+
+.history { display: flex; flex-direction: column; gap: 16px; }
+
+.history h2 {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--hud-cyan-bright);
+  text-shadow: var(--glow-sm);
+}
+
+.history.loading,
+.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 60px;
+  font-size: 10px;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--hud-cyan-dim);
+  animation: hud-pulse 1.4s infinite;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 70px 20px;
+  border: 1px dashed rgba(79, 227, 255, 0.2);
+  color: var(--hud-cyan-dim);
+}
+
+.empty-state p:first-child {
+  font-size: 12px;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: var(--hud-cyan);
+  margin: 0 0 10px;
+}
+
+.help-text {
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  color: var(--hud-cyan-dim);
+  margin: 0;
+}
+
+/* ── Log entries ───────────────────────────────────────── */
+
+.history-list { display: flex; flex-direction: column; gap: 9px; }
+
+.history-item {
+  position: relative;
+  background: linear-gradient(90deg, rgba(79, 227, 255, 0.05), transparent);
+  border: 1px solid rgba(79, 227, 255, 0.16);
+  border-left: 2px solid var(--hud-cyan);
+  padding: 12px 15px;
+  clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 0 100%);
+  transition: all 0.25s ease;
+}
+
+.history-item:hover {
+  border-color: rgba(79, 227, 255, 0.45);
+  border-left-color: var(--hud-cyan-bright);
+  background: linear-gradient(90deg, rgba(79, 227, 255, 0.11), transparent);
+}
+
+.history-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 9px;
+}
+
+.command-text {
+  flex: 1;
+  font-size: 11px;
+  color: var(--hud-cyan-bright);
+  word-break: break-word;
+}
+
+.command-text strong {
+  color: var(--hud-cyan-dim);
+  font-weight: 400;
+  font-size: 9px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  margin-right: 8px;
+}
+
+.command-time {
+  flex-shrink: 0;
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  color: var(--hud-cyan-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.history-response {
+  font-size: 11px;
+  line-height: 1.55;
+  color: #8fd4e8;
+  padding: 9px 12px;
+  background: rgba(0, 0, 0, 0.28);
+  border-left: 1px solid var(--hud-amber);
+}
+
+.history-response strong {
+  color: var(--hud-amber);
+  font-weight: 400;
+  font-size: 9px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  margin-right: 8px;
+}
+
+.history-skill { display: flex; gap: 7px; flex-wrap: wrap; margin-top: 10px; }
+
+.skill-badge {
+  font-size: 8px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--hud-cyan);
+  border: 1px solid var(--hud-cyan-line);
+  background: rgba(79, 227, 255, 0.06);
+  padding: 3px 9px;
+  clip-path: polygon(5px 0, 100% 0, 100% calc(100% - 5px), calc(100% - 5px) 100%, 0 100%, 0 5px);
+}
+
+/* ── Stats ─────────────────────────────────────────────── */
+
+.history-stats {
+  border: 1px solid var(--hud-panel-edge);
+  background: linear-gradient(180deg, rgba(12, 38, 58, 0.4), rgba(4, 16, 28, 0.28));
+  padding: 18px;
+  clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 16px 100%, 0 calc(100% - 16px));
+}
+
+.history-stats h3 {
+  margin: 0 0 16px;
+  font-size: 9px;
+  font-weight: 400;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--hud-cyan);
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 14px;
+}
+
+.stat {
+  text-align: center;
+  padding: 14px 8px;
+  border: 1px solid rgba(79, 227, 255, 0.14);
+  background: rgba(79, 227, 255, 0.04);
+}
+
+.stat-value {
+  font-size: 24px;
+  font-weight: 300;
+  color: var(--hud-cyan-bright);
+  text-shadow: var(--glow-md);
+  font-variant-numeric: tabular-nums;
+  margin-bottom: 7px;
+}
+
+.stat-label {
+  font-size: 8px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--hud-cyan-dim);
+}

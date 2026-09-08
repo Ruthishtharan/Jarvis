@@ -1,0 +1,195 @@
+/* ============================================================
+   Logs — diagnostics stream, HUD language
+   ============================================================ */
+
+.logs {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  height: 100%;
+}
+
+.logs-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+}
+
+.logs-header h2 {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--hud-cyan-bright);
+  text-shadow: var(--glow-sm);
+}
+
+.logs-controls {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.logs-controls label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 9px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--hud-cyan-dim);
+  cursor: pointer;
+}
+
+.logs-controls input[type='checkbox'] {
+  width: 13px;
+  height: 13px;
+  accent-color: var(--hud-cyan);
+  cursor: pointer;
+}
+
+.refresh-btn {
+  font-family: var(--hud-font);
+  font-size: 9px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--hud-cyan);
+  background: rgba(79, 227, 255, 0.05);
+  border: 1px solid var(--hud-cyan-line);
+  padding: 7px 14px;
+  cursor: pointer;
+  clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px);
+  transition: all 0.22s ease;
+}
+
+.refresh-btn:hover {
+  background: rgba(79, 227, 255, 0.14);
+  border-color: var(--hud-cyan);
+  color: var(--hud-cyan-bright);
+  box-shadow: 0 0 16px rgba(79, 227, 255, 0.2);
+}
+
+/* ── Stream ────────────────────────────────────────────── */
+
+.logs-container {
+  flex: 1;
+  min-height: 240px;
+  border: 1px solid var(--hud-panel-edge);
+  background: rgba(0, 0, 0, 0.42);
+  padding: 12px;
+  overflow: hidden;
+  display: flex;
+  clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 14px 100%, 0 calc(100% - 14px));
+}
+
+.logs-list {
+  flex: 1;
+  overflow-y: auto;
+  font-size: 10px;
+  line-height: 1.65;
+}
+
+.log-line {
+  display: flex;
+  gap: 11px;
+  align-items: flex-start;
+  padding: 3px 7px;
+  border-bottom: 1px solid rgba(79, 227, 255, 0.05);
+  transition: background 0.18s ease;
+}
+
+.log-line:hover { background: rgba(79, 227, 255, 0.05); }
+
+.log-level {
+  flex-shrink: 0;
+  min-width: 54px;
+  text-align: center;
+  font-size: 8px;
+  letter-spacing: 0.14em;
+  padding: 1px 5px;
+  border: 1px solid currentColor;
+  opacity: 0.9;
+}
+
+.log-line.error   .log-level { color: var(--hud-red); }
+.log-line.error   .log-text  { color: #ff9aa4; }
+.log-line.warning .log-level { color: var(--hud-amber); }
+.log-line.warning .log-text  { color: #ffd79c; }
+.log-line.info    .log-level { color: var(--hud-cyan); }
+.log-line.info    .log-text  { color: #8fd4e8; }
+.log-line.debug   .log-level { color: var(--hud-cyan-dim); }
+.log-line.debug   .log-text  { color: #5f8a9c; }
+
+.log-text {
+  flex: 1;
+  word-break: break-word;
+  white-space: pre-wrap;
+}
+
+/* ── Info + legend panels ──────────────────────────────── */
+
+.logs-info,
+.logs-legend {
+  border: 1px solid var(--hud-panel-edge);
+  background: linear-gradient(180deg, rgba(12, 38, 58, 0.38), rgba(4, 16, 28, 0.26));
+  padding: 14px 18px;
+  clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 14px 100%, 0 calc(100% - 14px));
+}
+
+.logs-info h4,
+.logs-legend h4 {
+  margin: 0 0 12px;
+  font-size: 9px;
+  font-weight: 400;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: var(--hud-cyan);
+}
+
+.logs-info ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 9px;
+}
+
+.logs-info li {
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  color: var(--hud-cyan-dim);
+}
+
+.logs-info li strong {
+  color: var(--hud-cyan-bright);
+  font-weight: 400;
+}
+
+.legend-items {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  color: var(--hud-cyan-dim);
+}
+
+.legend-dot {
+  width: 8px;
+  height: 8px;
+  flex-shrink: 0;
+}
+
+.legend-dot.error   { background: var(--hud-red);      box-shadow: 0 0 7px var(--hud-red); }
+.legend-dot.warning { background: var(--hud-amber);    box-shadow: 0 0 7px var(--hud-amber); }
+.legend-dot.info    { background: var(--hud-cyan);     box-shadow: 0 0 7px var(--hud-cyan); }
+.legend-dot.debug   { background: var(--hud-cyan-dim); }

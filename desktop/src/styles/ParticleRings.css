@@ -1,0 +1,66 @@
+/* ============================================================
+   ParticleRings — audio-reactive particle torus
+   ============================================================ */
+
+.prings {
+  position: relative;
+  width: 460px;
+  height: 460px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  --pr-glow: var(--hud-cyan);
+}
+
+.prings-offline   { --pr-glow: #2c4658; }
+.prings-idle      { --pr-glow: var(--hud-cyan); }
+.prings-listening { --pr-glow: var(--hud-cyan-bright); }
+.prings-thinking  { --pr-glow: var(--hud-cyan); }
+.prings-speaking  { --pr-glow: var(--hud-amber); }
+.prings-error     { --pr-glow: var(--hud-red); }
+
+/* The canvas is rendered at 460x460 internally and displayed 1:1, but
+   `pixelated` keeps the dots hard-edged if it is ever scaled — the point of
+   the aesthetic is that individual pixels stay visible. */
+.prings-canvas {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  background: transparent;
+  /* Bloom. Doing this in CSS is far cheaper than blurring in the buffer. */
+  filter: drop-shadow(0 0 12px var(--pr-glow))
+          drop-shadow(0 0 32px color-mix(in srgb, var(--pr-glow) 45%, transparent));
+  transition: filter 0.5s ease;
+}
+
+.prings-offline .prings-canvas {
+  opacity: 0.5;
+  filter: drop-shadow(0 0 6px var(--pr-glow));
+}
+
+/* Ambient halo behind the particles. */
+.prings-glow {
+  position: absolute;
+  width: 70%;
+  height: 70%;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--pr-glow) 0%, transparent 62%);
+  opacity: 0.12;
+  filter: blur(34px);
+  animation: prings-breathe 5s ease-in-out infinite;
+}
+
+.prings-speaking .prings-glow { animation-duration: 2.2s; opacity: 0.2; }
+.prings-listening .prings-glow { animation-duration: 3s; }
+
+@keyframes prings-breathe {
+  0%, 100% { opacity: 0.09; transform: scale(0.94); }
+  50%      { opacity: 0.22; transform: scale(1.06); }
+}
+
+@media (max-width: 1240px) {
+  .prings { width: 360px; height: 360px; }
+}

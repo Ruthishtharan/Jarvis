@@ -1,0 +1,165 @@
+/* ============================================================
+   JARVIS HUD — Design System
+   Holographic interface language: cyan wireframe, deep space,
+   glow bloom, monospace telemetry.
+   ============================================================ */
+
+:root {
+  /* Core palette */
+  --hud-cyan:        #4fe3ff;
+  --hud-cyan-bright: #a8f2ff;
+  --hud-cyan-dim:    #1d6f88;
+  --hud-cyan-ghost:  rgba(79, 227, 255, 0.12);
+  --hud-cyan-line:   rgba(79, 227, 255, 0.28);
+
+  --hud-amber:       #ffb64a;
+  --hud-amber-dim:   #8a5f1e;
+  --hud-red:         #ff4d5e;
+  --hud-green:       #4dffa6;
+
+  /* Depth */
+  --hud-void:        #01060e;
+  --hud-deep:        #030c18;
+  --hud-panel:       rgba(10, 30, 48, 0.35);
+  --hud-panel-edge:  rgba(79, 227, 255, 0.22);
+
+  /* Type */
+  --hud-font: 'SF Mono', 'JetBrains Mono', 'Menlo', 'Monaco', 'Courier New', monospace;
+
+  /* Glow */
+  --glow-sm: 0 0 6px rgba(79, 227, 255, 0.55);
+  --glow-md: 0 0 14px rgba(79, 227, 255, 0.45);
+  --glow-lg: 0 0 34px rgba(79, 227, 255, 0.35);
+}
+
+/* ── Base ──────────────────────────────────────────────── */
+
+* { box-sizing: border-box; }
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--hud-void);
+  color: var(--hud-cyan);
+  font-family: var(--hud-font);
+  font-size: 13px;
+  letter-spacing: 0.06em;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Ambient background layers ─────────────────────────── */
+
+.hud-bg {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Radial vignette — light bleeds from center, dies at edges */
+.hud-bg-glow {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 70% 55% at 50% 45%,
+      rgba(20, 80, 120, 0.30) 0%,
+      rgba(6, 26, 44, 0.14) 42%,
+      transparent 72%);
+}
+
+/* Engineering grid */
+.hud-bg-grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(79, 227, 255, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(79, 227, 255, 0.045) 1px, transparent 1px);
+  background-size: 46px 46px;
+  mask-image: radial-gradient(ellipse 75% 65% at 50% 50%, #000 30%, transparent 78%);
+  -webkit-mask-image: radial-gradient(ellipse 75% 65% at 50% 50%, #000 30%, transparent 78%);
+}
+
+/* CRT scanlines */
+.hud-bg-scan {
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    to bottom,
+    transparent 0px,
+    transparent 2px,
+    rgba(79, 227, 255, 0.030) 3px,
+    transparent 4px
+  );
+  opacity: 0.65;
+}
+
+/* Sweeping scan bar */
+.hud-bg-sweep {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 180px;
+  background: linear-gradient(
+    to bottom,
+    transparent,
+    rgba(79, 227, 255, 0.055),
+    transparent
+  );
+  animation: hud-sweep 7s linear infinite;
+}
+
+@keyframes hud-sweep {
+  0%   { transform: translateY(-200px); }
+  100% { transform: translateY(100vh); }
+}
+
+/* ── Typography utilities ──────────────────────────────── */
+
+.hud-label {
+  font-size: 9px;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--hud-cyan-dim);
+}
+
+.hud-value {
+  font-size: 26px;
+  font-weight: 300;
+  color: var(--hud-cyan-bright);
+  text-shadow: var(--glow-md);
+  font-variant-numeric: tabular-nums;
+}
+
+.hud-mono { font-variant-numeric: tabular-nums; }
+
+.glow      { text-shadow: var(--glow-sm); }
+.glow-hard { text-shadow: var(--glow-md); }
+
+/* ── Scrollbars ────────────────────────────────────────── */
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: rgba(79, 227, 255, 0.04); }
+::-webkit-scrollbar-thumb { background: var(--hud-cyan-dim); border-radius: 0; }
+::-webkit-scrollbar-thumb:hover { background: var(--hud-cyan); }
+
+/* ── Shared animations ─────────────────────────────────── */
+
+@keyframes hud-flicker {
+  0%, 100%  { opacity: 1; }
+  48%       { opacity: 1; }
+  50%       { opacity: 0.72; }
+  52%       { opacity: 1; }
+}
+
+@keyframes hud-pulse {
+  0%, 100% { opacity: 0.45; }
+  50%      { opacity: 1; }
+}
+
+@keyframes spin-cw  { from { transform: rotate(0deg); }   to { transform: rotate(360deg); } }
+@keyframes spin-ccw { from { transform: rotate(360deg); } to { transform: rotate(0deg); } }

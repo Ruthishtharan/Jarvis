@@ -1,0 +1,171 @@
+/* ============================================================
+   ArcReactor — rotating holographic core
+   ============================================================ */
+
+.arc-reactor {
+  position: relative;
+  width: 340px;
+  height: 340px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  /* Per-state color channel, consumed by the SVG via var() */
+  --rc-main:   var(--hud-cyan);
+  --rc-bright: var(--hud-cyan-bright);
+  --rc-speed:  1;
+}
+
+/* ── State channels ────────────────────────────────────── */
+
+.arc-reactor.state-offline {
+  --rc-main:   #2c4658;
+  --rc-bright: #4a6b80;
+  --rc-speed:  4;      /* rings crawl when dormant */
+  opacity: 0.55;
+}
+
+.arc-reactor.state-idle {
+  --rc-main:   var(--hud-cyan);
+  --rc-bright: var(--hud-cyan-bright);
+  --rc-speed:  1.6;
+}
+
+.arc-reactor.state-listening {
+  --rc-main:   var(--hud-cyan-bright);
+  --rc-bright: #ffffff;
+  --rc-speed:  0.45;   /* spins up */
+}
+
+.arc-reactor.state-thinking {
+  --rc-main:   var(--hud-cyan);
+  --rc-bright: var(--hud-cyan-bright);
+  --rc-speed:  0.3;
+}
+
+.arc-reactor.state-speaking {
+  --rc-main:   var(--hud-amber);
+  --rc-bright: #ffe0a8;
+  --rc-speed:  0.7;
+}
+
+.arc-reactor.state-error {
+  --rc-main:   var(--hud-red);
+  --rc-bright: #ff9aa4;
+  --rc-speed:  2.5;
+  animation: hud-flicker 2.2s infinite;
+}
+
+/* ── Bloom halo ────────────────────────────────────────── */
+
+.arc-halo {
+  position: absolute;
+  width: 78%;
+  height: 78%;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    var(--rc-main) 0%,
+    transparent 62%
+  );
+  opacity: 0.16;
+  filter: blur(26px);
+  animation: halo-breathe calc(3.4s * var(--rc-speed)) ease-in-out infinite;
+}
+
+@keyframes halo-breathe {
+  0%, 100% { opacity: 0.11; transform: scale(0.94); }
+  50%      { opacity: 0.26; transform: scale(1.06); }
+}
+
+/* ── SVG stack ─────────────────────────────────────────── */
+
+.arc-svg {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.ring-outer    { animation: spin-cw  calc(46s * var(--rc-speed)) linear infinite; }
+.ring-ticks    { animation: spin-ccw calc(30s * var(--rc-speed)) linear infinite; }
+.ring-segments { animation: spin-cw  calc(15s * var(--rc-speed)) linear infinite; }
+.ring-sweep    { animation: spin-cw  calc(3.4s * var(--rc-speed)) linear infinite; }
+.ring-inner    { animation: spin-ccw calc(22s * var(--rc-speed)) linear infinite; }
+
+.reactor-housing {
+  animation: hud-pulse calc(4s * var(--rc-speed)) ease-in-out infinite;
+  transform-origin: 100px 100px;
+}
+
+.reactor-core {
+  animation: core-breathe calc(2.6s * var(--rc-speed)) ease-in-out infinite;
+  transform-origin: 100px 100px;
+}
+
+@keyframes core-breathe {
+  0%, 100% { opacity: 0.72; transform: scale(0.92); }
+  50%      { opacity: 1;    transform: scale(1.08); }
+}
+
+.reactor-core-pin {
+  animation: pin-flare calc(2.6s * var(--rc-speed)) ease-in-out infinite;
+  transform-origin: 100px 100px;
+}
+
+@keyframes pin-flare {
+  0%, 100% { opacity: 0.85; r: 7; }
+  50%      { opacity: 1;    r: 10; }
+}
+
+/* ── Readout ───────────────────────────────────────────── */
+
+.arc-readout {
+  position: absolute;
+  bottom: 14px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  pointer-events: none;
+}
+
+.arc-status {
+  font-size: 12px;
+  letter-spacing: 0.34em;
+  text-transform: uppercase;
+  color: var(--rc-bright);
+}
+
+.arc-sub {
+  margin-top: 5px;
+  font-size: 9px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--hud-cyan-dim);
+}
+
+/* ── Voice waveform ────────────────────────────────────── */
+
+.arc-waveform {
+  position: absolute;
+  bottom: -28px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  height: 26px;
+}
+
+.arc-waveform span {
+  display: block;
+  width: 2px;
+  background: var(--rc-main);
+  box-shadow: 0 0 6px var(--rc-main);
+  animation: wave-bounce 0.9s ease-in-out infinite;
+}
+
+@keyframes wave-bounce {
+  0%, 100% { height: 3px;  opacity: 0.4; }
+  50%      { height: 22px; opacity: 1; }
+}
