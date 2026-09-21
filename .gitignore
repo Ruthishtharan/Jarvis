@@ -59,3 +59,7 @@ data/*.tmp
 data/tts_cache/
 data/tts_web_cache/
 .env
+
+# Local environment backups
+.env.backup
+.env.backup.*
