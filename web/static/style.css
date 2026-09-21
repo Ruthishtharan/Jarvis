@@ -1,0 +1,434 @@
+/* JARVIS — voice-first interface.
+ *
+ * The star is the interface. Everything else is deliberately quiet: thin
+ * type, low contrast, no panels competing for attention. Chrome only appears
+ * when you ask for it (transcript / settings drawers).
+ */
+
+:root {
+  --fg:      #e8f4ff;
+  --dim:     rgba(232, 244, 255, 0.42);
+  --faint:   rgba(232, 244, 255, 0.13);
+  --hot:     #ffb457;
+  --live:    #48e08a;
+  --bad:     #ff5c6c;
+  --panel:   rgba(8, 10, 16, 0.86);
+  --sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", system-ui, sans-serif;
+  --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, monospace;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  height: 100%;
+  background: #000;
+  color: var(--fg);
+  font: 15px/1.6 var(--sans);
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+button, input, select { font: inherit; color: inherit; }
+button { cursor: pointer; background: none; border: 0; }
+
+#sun { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; z-index: 0; }
+
+/* ── Status strip ─────────────────────────────────────────────────── */
+
+.status {
+  position: fixed; z-index: 4; top: 0; left: 0; right: 0;
+  display: flex; align-items: center; gap: 9px;
+  padding: 18px 22px;
+  font: 11.5px/1 var(--mono);
+  letter-spacing: 0.09em;
+  color: var(--dim);
+  text-transform: lowercase;
+}
+.status .spacer { flex: 1; }
+.status .sep { opacity: 0.35; }
+
+.pip {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--bad);
+  box-shadow: 0 0 9px currentColor;
+  transition: background 0.3s;
+}
+.pip.on { background: var(--live); }
+
+.ghost {
+  padding: 6px 11px; border-radius: 999px;
+  font: 11.5px/1 var(--mono); letter-spacing: 0.09em;
+  color: var(--dim); border: 1px solid var(--faint);
+  transition: color 0.18s, border-color 0.18s;
+}
+.ghost:hover { color: var(--fg); border-color: rgba(232,244,255,0.32); }
+
+/* ── Conversation ─────────────────────────────────────────────────── */
+
+.convo {
+  position: fixed; z-index: 3; inset: 0;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: flex-end;
+  gap: 14px;
+  padding: 0 8vw 246px;
+  pointer-events: none;
+  text-align: center;
+}
+
+/* What you said — smaller, above, quieter. */
+.you {
+  font: 400 15px/1.5 var(--sans);
+  color: var(--dim);
+  letter-spacing: 0.01em;
+  max-width: 46ch;
+  min-height: 1.5em;
+  transition: opacity 0.3s;
+}
+.you.interim { opacity: 0.55; font-style: italic; }
+/* Overheard but not addressed to JARVIS — visibly present, visibly ignored. */
+.you.passive { opacity: 0.32; font-size: 13.5px; }
+.you.passive::before {
+  content: '· ';
+  color: var(--dim);
+}
+.you:empty { opacity: 0; }
+
+/* What JARVIS said. Clamped on purpose: a long answer used to fill the whole
+   screen and bury the star. The full text lives in the chat drawer. */
+.jarvis {
+  font: 300 26px/1.45 var(--sans);
+  letter-spacing: -0.012em;
+  color: #fff;
+  max-width: 26ch;
+  min-height: 1.45em;
+  text-shadow: 0 2px 34px rgba(0, 0, 0, 0.85);
+  transition: opacity 0.35s;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.readmore {
+  margin-top: 4px;
+  padding: 5px 13px; border-radius: 999px;
+  font: 11.5px/1 var(--mono); letter-spacing: 0.07em;
+  color: var(--dim); border: 1px solid var(--faint);
+  pointer-events: auto;
+  transition: color 0.18s, border-color 0.18s;
+}
+.readmore:hover { color: var(--fg); border-color: rgba(232,244,255,0.34); }
+.readmore[hidden] { display: none; }
+.jarvis:empty { opacity: 0; }
+
+.hint {
+  font: 11.5px/1 var(--mono); letter-spacing: 0.09em;
+  color: var(--dim); opacity: 0.75;
+  transition: opacity 0.3s;
+}
+.hint.gone { opacity: 0; }
+.linkish {
+  color: var(--live); text-decoration: underline;
+  font: inherit; padding: 0; cursor: pointer;
+}
+.linkish:hover { filter: brightness(1.2); }
+kbd {
+  padding: 2px 6px; border-radius: 5px;
+  border: 1px solid var(--faint);
+  font: 10.5px/1 var(--mono);
+}
+
+/* ── Voice control ────────────────────────────────────────────────── */
+
+.voice {
+  position: fixed; z-index: 5;
+  left: 0; right: 0; bottom: 0;
+  display: flex; flex-direction: column;
+  align-items: center; gap: 16px;
+  padding: 0 20px 42px;
+  pointer-events: none;
+}
+.voice > * { pointer-events: auto; }
+
+/* Waveform — 28 bars driven by real mic amplitude. */
+.wave {
+  display: flex; align-items: center; justify-content: center;
+  gap: 3px; height: 30px;
+  opacity: 0; transition: opacity 0.25s;
+}
+.wave.on { opacity: 1; }
+.wave i {
+  display: block; width: 2.5px; height: 3px;
+  border-radius: 2px;
+  background: var(--live);
+  transform-origin: center;
+  transition: height 0.07s linear;
+}
+
+.orb {
+  position: relative;
+  width: 76px; height: 76px;
+  display: grid; place-items: center;
+  border-radius: 50%;
+  color: var(--fg);
+  background: rgba(255, 255, 255, 0.045);
+  border: 1px solid rgba(232, 244, 255, 0.20);
+  backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+  transition: transform 0.16s cubic-bezier(.2,.9,.3,1.4),
+              background 0.2s, border-color 0.2s, color 0.2s;
+}
+.orb:hover { background: rgba(255,255,255,0.09); transform: scale(1.045); }
+.orb:active { transform: scale(0.96); }
+
+.orb.rec {
+  color: #06180f;
+  background: var(--live);
+  border-color: var(--live);
+  transform: scale(1.09);
+}
+/* Halo lives on a pseudo-element so it can't fight the scale transform. */
+.orb.rec::after {
+  content: ''; position: absolute; inset: -6px;
+  border-radius: 50%; border: 1px solid var(--live);
+  animation: halo 1.5s ease-out infinite;
+}
+@keyframes halo {
+  0%   { transform: scale(1);    opacity: 0.7; }
+  100% { transform: scale(1.55); opacity: 0; }
+}
+
+.orb.muted {
+  color: var(--bad);
+  border-color: rgba(255, 92, 108, 0.5);
+  background: rgba(255, 92, 108, 0.09);
+}
+.orb.muted::after { display: none; }
+
+.orb.busy {
+  color: var(--hot);
+  border-color: rgba(255, 180, 87, 0.55);
+  background: rgba(255, 180, 87, 0.08);
+}
+
+.type { width: min(420px, 76vw); }
+.type input {
+  width: 100%; padding: 10px 16px;
+  font: 13.5px/1 var(--sans);
+  text-align: center;
+  color: var(--fg);
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid transparent;
+  border-radius: 999px;
+  outline: none;
+  transition: border-color 0.2s, background 0.2s;
+}
+.type input::placeholder { color: rgba(232,244,255,0.3); }
+.type input:focus {
+  border-color: rgba(232,244,255,0.24);
+  background: rgba(255,255,255,0.07);
+}
+
+/* ── Drawers ──────────────────────────────────────────────────────── */
+
+.drawer {
+  position: fixed; z-index: 8; top: 0; bottom: 0; left: 0;
+  width: min(400px, 88vw);
+  display: flex; flex-direction: column;
+  background: var(--panel);
+  backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
+  border-right: 1px solid var(--faint);
+  transform: translateX(-100%);
+  transition: transform 0.3s cubic-bezier(.4,0,.2,1);
+}
+.drawer.wide { width: min(560px, 92vw); }
+
+.chatbar {
+  display: flex; gap: 9px; padding: 14px 22px 18px;
+  border-top: 1px solid var(--faint);
+}
+.chatbar input {
+  flex: 1; padding: 11px 15px; font-size: 13.5px;
+  color: var(--fg); background: rgba(255,255,255,0.05);
+  border: 1px solid var(--faint); border-radius: 10px; outline: none;
+}
+.chatbar input:focus { border-color: rgba(232,244,255,0.32); }
+.chatbar .btn {
+  padding: 11px 18px; border-radius: 10px; font-size: 13px;
+  color: #04180d; background: var(--live); border: 0; font-weight: 600;
+}
+
+.msg { padding: 12px 0; border-bottom: 1px solid rgba(232,244,255,0.05); }
+.msg:last-child { border-bottom: 0; }
+.msg .who {
+  font: 10px/1 var(--mono); letter-spacing: 0.12em;
+  color: var(--dim); text-transform: uppercase; margin-bottom: 6px;
+}
+.msg.me .who { color: var(--live); }
+.msg .body { font-size: 14px; line-height: 1.65; white-space: pre-wrap; }
+.msg .body strong { font-weight: 600; }
+.msg .meta { font: 10px/1 var(--mono); color: rgba(232,244,255,0.28); margin-top: 7px; }
+
+.drawer.right {
+  left: auto; right: 0;
+  border-right: 0; border-left: 1px solid var(--faint);
+  transform: translateX(100%);
+}
+.drawer.open { transform: translateX(0); }
+
+.drawer-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 20px 22px;
+  font: 11.5px/1 var(--mono); letter-spacing: 0.11em;
+  color: var(--dim); text-transform: lowercase;
+  border-bottom: 1px solid var(--faint);
+}
+.drawer-body { flex: 1; overflow-y: auto; padding: 18px 22px 40px; }
+
+/* Transcript entries */
+.turn { padding: 13px 0; border-bottom: 1px solid rgba(232,244,255,0.055); }
+.turn:last-child { border-bottom: 0; }
+.turn .q { font-size: 14px; color: var(--fg); }
+.turn .a { font-size: 13.5px; color: var(--dim); margin-top: 4px; }
+.turn .m {
+  margin-top: 6px;
+  font: 10px/1 var(--mono); letter-spacing: 0.07em;
+  color: rgba(232,244,255,0.28);
+}
+.empty { font-size: 13.5px; color: var(--dim); padding: 8px 0; }
+
+/* Settings */
+.grp { margin-bottom: 30px; }
+.grp h3 {
+  font: 11px/1 var(--mono); letter-spacing: 0.13em;
+  color: var(--dim); text-transform: lowercase;
+  margin-bottom: 14px;
+}
+.grp h3.toggle { cursor: pointer; display: flex; justify-content: space-between; }
+.grp .chev { transition: transform 0.2s; }
+.grp.collapsed .chev { transform: rotate(-90deg); }
+.grp.collapsed .sliders { display: none; }
+
+.opt {
+  display: flex; align-items: center; gap: 11px;
+  padding: 9px 0; font-size: 13.5px; cursor: pointer;
+}
+.opt.col { flex-direction: column; align-items: stretch; gap: 9px; }
+.opt.col span { font-size: 13px; color: var(--dim); }
+.opt.col b { color: var(--fg); font-weight: 500; }
+.opt input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--live); }
+.opt select {
+  padding: 8px 10px; border-radius: 8px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid var(--faint);
+  outline: none; font-size: 13px;
+}
+
+input[type=range] {
+  -webkit-appearance: none; appearance: none;
+  width: 100%; height: 2px; border-radius: 2px;
+  background: rgba(232,244,255,0.18);
+  outline: none; cursor: pointer;
+}
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 13px; height: 13px; border-radius: 50%;
+  background: var(--fg); border: 0;
+}
+input[type=range]::-moz-range-thumb {
+  width: 13px; height: 13px; border-radius: 50%;
+  background: var(--fg); border: 0;
+}
+
+.slider { margin-bottom: 15px; }
+.slider .top {
+  display: flex; justify-content: space-between;
+  font-size: 12.5px; color: var(--dim); margin-bottom: 7px;
+}
+.slider .top b { color: var(--fg); font-weight: 500; }
+
+.ghost.wide {
+  width: 100%; margin-top: 12px; padding: 10px;
+  border-radius: 8px; text-transform: none; letter-spacing: 0.04em;
+}
+
+.sys div {
+  display: flex; justify-content: space-between; gap: 12px;
+  padding: 5px 0; font: 12px/1.5 var(--mono);
+}
+.sys .k { color: var(--dim); }
+.sys .v.bad  { color: var(--bad); }
+.sys .v.good { color: var(--live); }
+
+/* ── Toast ────────────────────────────────────────────────────────── */
+
+.toast {
+  position: fixed; z-index: 9;
+  left: 50%; bottom: 172px; transform: translate(-50%, 10px);
+  padding: 9px 16px; border-radius: 999px;
+  font: 12px/1 var(--mono); letter-spacing: 0.05em;
+  color: var(--dim);
+  background: var(--panel);
+  border: 1px solid var(--faint);
+  backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.25s, transform 0.25s;
+  max-width: 78vw; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis;
+}
+.toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-thumb { background: rgba(232,244,255,0.16); border-radius: 3px; }
+
+@media (max-width: 640px) {
+  .jarvis { font-size: 22px; max-width: 20ch; }
+  .convo { padding-bottom: 232px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .orb.rec::after { animation: none; }
+  * { transition-duration: 0.01ms !important; }
+}
+
+
+/* ── Clean mode ───────────────────────────────────────────────────────
+ *
+ * The screen is the star and the microphone. Nothing else.
+ *
+ * Every word that used to sit over the star — the transcript, the reply,
+ * the hint, the toasts — now lives in the chat drawer. The visual state is
+ * carried by the star itself and the orb: idle is calm and gold, listening
+ * turns the orb green with a live waveform, thinking runs hot and fast,
+ * speaking flares. That is enough to know what it is doing without reading.
+ *
+ * The top bar is not deleted, only hidden: you still need a way into chat and
+ * settings. It fades in when the pointer goes near the top of the window and
+ * fades back out when it leaves.
+ */
+
+body.clean .convo { display: none; }
+body.clean .type { display: none; }
+body.clean .toast { display: none; }
+
+body.clean .status {
+  opacity: 0;
+  transition: opacity 0.35s ease;
+  pointer-events: none;
+}
+body.clean .status.peek,
+body.clean .status:hover {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Without the transcript above it, the orb should sit visually centred
+   under the star rather than clinging to the bottom edge. */
+body.clean .voice { padding-bottom: 72px; }
+
+
+/* One exception to clean mode. A blocked microphone is a hard failure the
+ * user cannot diagnose from the star alone — silence looks identical to
+ * "nothing said yet". This stays visible, and only this. */
+body.clean .convo.critical { display: flex; }
+body.clean .convo.critical .you,
+body.clean .convo.critical .jarvis,
+body.clean .convo.critical .readmore { display: none; }
+body.clean .convo.critical .hint { opacity: 1; }

@@ -24,7 +24,7 @@ def open_web_search(query: str, engine: str = "google"):
 
 def quick_search_results(query: str) -> list[str]:
     try:
-        from duckduckgo_search import DDGS
+        from ddgs import DDGS
         with DDGS() as ddgs:
             results = list(ddgs.text(query, max_results=3))
             return [r.get("title", "") + ": " + r.get("href", "") for r in results]

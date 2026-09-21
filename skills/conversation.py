@@ -4,13 +4,69 @@
 Runs when no other skill confidently matches — delegates to the Groq LLM
 via `ai.conversation_engine.ConversationEngine`.  Uses the lowest priority
 so every specific skill gets first crack at the utterance.
+
+LANGUAGE SUPPORT
+----------------
+This skill now carries the language through from match → engine → TTS,
+so free-form conversation works in any language the user speaks.  The
+`_lang_code_for()` heuristic infers the language from the text when the
+frontend didn't send it (chat input, agents).  When the frontend DOES send
+it (voice loop, /api/command with `lang`), it arrives via entities.
 """
 
+from __future__ import annotations
+
+from typing import Optional
+
+from ai import local_persona
 from ai.conversation_engine import ConversationEngine
 from ai.memory import ConversationMemory
 from multitasking.async_executor import run_in_thread
 from skills._base import Skill, SkillMatch, SkillResult
+from utils.logger import get_logger
 from voice.text_to_speech import get_tts
+
+logger = get_logger(__name__)
+
+
+def _lang_code_for(text: str) -> str:
+    """Best-guess BCP-47 tag from the content of `text`.
+
+    Whisper already transcribed this, so a non-ASCII script is a strong
+    signal.  We keep it cheap: detect the script family and map to the
+    closest registered language, falling back to English.
+    """
+    try:
+        non_ascii = sum(1 for c in text if ord(c) > 127)
+        if non_ascii == 0:
+            return "en"
+        for c in text:
+            o = ord(c)
+            if 0x0B80 <= o <= 0x0BFF:   # Tamil
+                return "ta-IN"
+            if 0x0900 <= o <= 0x097F:   # Hindi/Devanagari
+                return "hi-IN"
+            if 0x0C80 <= o <= 0x0CFF:   # Kannada
+                return "kn-IN"
+            if 0x0D00 <= o <= 0x0D7F:   # Malayalam
+                return "ml-IN"
+            if 0x0C00 <= o <= 0x0C7F:   # Telugu
+                return "te-IN"
+            if 0x0980 <= o <= 0x09FF:   # Bengali
+                return "bn-IN"
+            if 0x3040 <= o <= 0x309F:   # Hiragana
+                return "ja-JP"
+            if 0x4E00 <= o <= 0x9FFF:   # CJK unified
+                return "zh-CN"
+            if 0xAC00 <= o <= 0xD7AF:   # Korean syllables
+                return "ko-KR"
+            if 0x0600 <= o <= 0x06FF:   # Arabic
+                return "ar-SA"
+            if 0x0400 <= o <= 0x04FF:   # Cyrillic
+                return "ru-RU"
+    except Exception:
+        pass
+    return "en"
 
 
 class ConversationSkill(Skill):
@@ -19,25 +75,39 @@ class ConversationSkill(Skill):
     priority = 999  # dead last
 
     def __init__(self):
-        # Shared with other callers of ConversationEngine — they can look
-        # this instance up via `get_registry().by_name("conversation").engine`
-        # if they need the same memory (e.g. the WhatsApp skill asking a
-        # clarifying question).
         self._memory = ConversationMemory()
-        self.engine = ConversationEngine(self._memory)
+        self.engine = ConversationEngine(self._memory, default_lang="en")
         self._tts = get_tts()
 
-    def match(self, text: str) -> SkillMatch | None:
-        # Always match, but at minimal confidence — acts as the catch-all.
+    def match(self, text: str) -> Optional[SkillMatch]:
         if not text.strip():
             return None
         return SkillMatch(confidence=0.05)
 
     async def run(self, text: str, entities: dict) -> SkillResult:
-        # Stream Groq tokens → TTS sentence-by-sentence.  Time-to-first-word
-        # drops from "wait for full reply" to "wait for first sentence".
-        def stream_to_tts() -> str:
-            return self.engine.chat_stream(text, on_sentence=self._tts.speak)
+        lang_code = entities.get("lang_code", _lang_code_for(text))
 
-        full_reply = await run_in_thread(stream_to_tts)
+        # Short social turns ("thanks", "hey", "got it") go to the local
+        # persona LoRA: ~0.3s and offline, against ~1.3s for a Groq round trip
+        # that needed no knowledge to answer. Everything else — including
+        # anything the allowlist does not recognise — continues to Groq below.
+        #
+        # `reply()` returns None on any failure, so a stopped LoRA server is
+        # indistinguishable from this block not existing.
+        if local_persona.is_social(text, lang_code):
+            local = await run_in_thread(lambda: local_persona.reply(text))
+            if local:
+                logger.info(f"persona LoRA handled: {text[:40]!r}")
+                self._tts.speak_async(local, lang_code)
+                self._memory.add("user", text)
+                self._memory.add("assistant", local)
+                return SkillResult(text=local, already_spoken=True)
+        # Stream Groq tokens → TTS sentence-by-sentence, with the right
+        # language voiced.  Time-to-first-word drops from "wait for full
+        # reply" to "wait for first sentence".
+        full_reply = await run_in_thread(
+            lambda: self.engine.chat_stream(
+                text,
+                on_sentence=lambda s: self._tts.speak_async(s, lang_code),
+                lang_code=lang_code))
         return SkillResult(text=full_reply, already_spoken=True)

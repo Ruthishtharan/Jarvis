@@ -47,3 +47,14 @@ Thumbs.db
 # ── Whisper model caches (can be tens of MB–GB) ──────────────────────────────
 *.pt
 *.bin
+
+# ECC install state — contains absolute machine paths, not portable.
+# The skills themselves under .claude/skills/ ARE committed on purpose:
+# they're shareable config and belong with the repo.
+.claude/ecc/
+
+# Generated files
+.env.bak.*
+data/*.tmp
+data/tts_cache/
+data/tts_web_cache/

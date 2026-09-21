@@ -64,7 +64,7 @@ def check_deps() -> None:
     }
     optional = {
         "whisper": "offline speech-to-text",
-        "duckduckgo_search": "web search skill",
+        "ddgs": "web search skill",
         "psutil": "system stats skill",
         "pyjokes": "jokes skill",
         "torch": "local intent model",
@@ -120,12 +120,14 @@ def check_config() -> None:
 
     # Show the actual resolved chain, not just the flag.
     try:
-        from voice.audio_utils import create_recognizer
-        from voice.stt_engines import build_stt
-        chain = build_stt(create_recognizer())
+        from conversation.audio_io import pcm_to_wav
+        from conversation.stt import SpeechToText
+        from conversation.audio_io import Microphone
+        mic = Microphone()
+        chain = SpeechToText()
         order = " -> ".join(e.name for e in chain.engines)
         ok(f"speech-to-text chain: {order}")
-        if chain.engines and chain.engines[0].name == "whisper":
+        if chain.engines and chain.engines[0].name == "whisper-local":
             warn("local Whisper is primary (1118ms measured)",
                  "Groq whisper-large-v3-turbo measured 229ms here — 4.9x faster "
                  "at the same accuracy. Set USE_OFFLINE_STT=false in .env to use "
@@ -302,6 +304,51 @@ def check_skills_and_model() -> None:
 
 
 def check_network() -> None:
+    section("macOS permissions")
+    # Probe with operations that genuinely require each permission. A weaker
+    # check is worse than none: "System Events to count processes" succeeds
+    # without Accessibility, so it reports success while every keystroke the
+    # WhatsApp skill sends still fails with -25211.
+    import subprocess as _sp
+
+    ax = _sp.run(
+        ["osascript", "-e",
+         'tell application "System Events" to tell process "Finder" '
+         'to return count of windows'],
+        capture_output=True, text=True)
+    if ax.returncode == 0:
+        ok("Accessibility granted (WhatsApp send can type)")
+    else:
+        warn("Accessibility NOT granted — WhatsApp send will fail",
+             "System Settings > Privacy & Security > Accessibility, add the "
+             "app that launches JARVIS (Terminal or Neutron)")
+
+    try:
+        from integrations.whatsapp import notification_reader as _nr
+        fda_ok, fda_why = _nr.available()
+    except Exception as exc:  # noqa: BLE001
+        fda_ok, fda_why = False, str(exc)[:80]
+    if fda_ok:
+        ok("Full Disk Access granted (can read WhatsApp notifications)")
+    else:
+        warn("Full Disk Access NOT granted — cannot read WhatsApp messages",
+             fda_why)
+
+    section("Persona LoRA (local fast path)")
+    # Optional, but check it explicitly. When this server is down JARVIS still
+    # answers correctly via Groq — which is exactly why its absence is easy to
+    # miss. The whole point of the LoRA is that short turns get answered in
+    # ~0.4s instead of ~1.3s, and silence here would hide losing that.
+    try:
+        import urllib.request, json as _json
+        with urllib.request.urlopen("http://127.0.0.1:8421/health", timeout=2) as r:
+            info = _json.loads(r.read())
+        ok(f"persona LoRA serving ({info.get('adapter', '?')})")
+    except Exception:
+        warn("persona LoRA server not running",
+             "social turns fall back to Groq (~1.3s instead of ~0.4s) — start: "
+             "./start_persona.sh")
+
     section("Network")
     import socket
     try:

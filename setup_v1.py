@@ -68,7 +68,7 @@ def install_dependencies():
     print_header("Installing Dependencies")
 
     packages = [
-        ("duckduckgo-search", "Web search library"),
+        ("ddgs", "Web search library"),
         ("pyobjc-framework-Cocoa", "macOS integration"),
         ("pyobjc-framework-AppKit", "Menu bar app"),
     ]

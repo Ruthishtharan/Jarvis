@@ -30,6 +30,20 @@ _WELL_KNOWN_SITES = [
 logger = get_logger(__name__)
 
 
+def _safety_check(url: str):
+    """Never let the check itself stop a website opening. If url_safety is
+    broken or missing, the skill must behave exactly as it did before it
+    existed — a security add-on that takes the feature down with it when it
+    fails is a worse bug than the one it prevents."""
+    try:
+        from security.url_safety import check
+
+        return check(url)
+    except Exception as e:
+        logger.debug(f"URL safety check unavailable: {e}")
+        return None
+
+
 class OpenWebsiteSkill(Skill):
     name = "open_website"
     description = "Open a website in the default browser"
@@ -101,8 +115,29 @@ class OpenWebsiteSkill(Skill):
                      "Want me to search for it instead?"
             )
 
-        ok = await run_in_thread(open_url, target)
         label = entities.get("site_name") or target
-        if ok is False:
-            return SkillResult(text=f"I couldn't open {label}.")
-        return SkillResult(text=f"Opening {label}.")
+
+        async def _do() -> str:
+            ok = await run_in_thread(open_url, target)
+            return (f"I couldn't open {label}." if ok is False
+                    else f"Opening {label}.")
+
+        # This is the only place JARVIS puts a URL in front of a human who has
+        # credentials, so it is the only place a phishing check belongs. The
+        # research path reads pages with no credentials and no browser, and is
+        # deliberately left alone.
+        #
+        # Suspicion asks rather than blocks. These are heuristics, not proof —
+        # the first time a false positive refuses a real site outright, the
+        # check stops being worth having.
+        verdict = await run_in_thread(_safety_check, target)
+        if verdict is not None and verdict.suspicious:
+            from core.confirmation import PendingAction
+
+            return SkillResult(
+                text=f"That link looks unsafe — {verdict.summary}. "
+                     "Open it anyway?",
+                confirm=PendingAction(description=f"open {label}", run=_do),
+            )
+
+        return SkillResult(text=await _do())

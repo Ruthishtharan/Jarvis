@@ -4,7 +4,7 @@ pyaudio>=0.2.14
 openai-whisper>=20231117
 python-dotenv>=1.0.0
 requests>=2.31.0
-duckduckgo-search>=6.1.0
+ddgs>=9.0
 
 # ── Ported from GauravSingh9356/J.A.R.V.I.S feature set ──────────────────────
 psutil>=5.9.0        # system_stats skill — CPU / RAM / disk

@@ -14,7 +14,16 @@ from automation.app_control import open_app
 from multitasking.async_executor import run_in_thread
 from skills._base import Skill, SkillMatch, SkillResult
 
-_PATTERN = re.compile(r"(?:open|launch|start|run)\s+(?:the\s+)?(.+)")
+# "go to X" / "switch to X" / "take me to X" are how people actually ask for an
+# app that is already running — and none of them matched. "go to the Obsidian
+# app" fell through to the conversation engine, which announced "Opening
+# Obsidian... Obsidian's up and running" without opening anything.
+#
+# open_website (priority 25) gets first refusal on "go to", but it only claims
+# things that look like domains, so "go to obsidian" reaches here.
+_PATTERN = re.compile(
+    r"(?:open(?:\s+up)?|launch|start|run|go\s+to|goto|switch\s+to"
+    r"|take\s+me\s+to|bring\s+up|pull\s+up|show\s+me)\s+(?:the\s+)?(.+)")
 
 # Shared filler set — mirrors `ai.local_intent_classifier._clean_captured_app`.
 # Kept in-skill so each skill file is self-contained.

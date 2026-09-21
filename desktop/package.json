@@ -1,28 +1,20 @@
 {
   "name": "jarvis-desktop",
   "version": "1.0.0",
-  "description": "JARVIS Desktop Control Panel - AI Assistant for macOS",
-  "main": "public/electron.js",
+  "description": "JARVIS \u2014 voice assistant and its control brain",
+  "main": "main-jarvis.js",
   "homepage": "./",
   "author": "Ruthish",
   "license": "MIT",
   "scripts": {
-    "react-start": "react-scripts start",
-    "react-build": "react-scripts build",
-    "react-test": "react-scripts test",
-    "react-eject": "react-scripts eject",
-    "electron-start": "concurrently \"npm run react-start\" \"wait-on http://localhost:3000 && electron .\"",
-    "electron-build": "npm run react-build && electron-builder",
-    "start": "concurrently \"npm run react-start\" \"wait-on http://localhost:3000 && electron .\"",
-    "build": "npm run react-build && electron-builder",
-    "dev": "concurrently \"npm run react-start\" \"wait-on http://localhost:3000 && electron . --dev\""
+    "jarvis": "electron main-jarvis.js",
+    "brain": "electron main-brain.js",
+    "both": "concurrently \"npm run jarvis\" \"npm run brain\"",
+    "build:jarvis": "electron-builder --config electron-builder-jarvis.yml",
+    "build:brain": "electron-builder --config electron-builder-brain.yml",
+    "build": "npm run build:jarvis && npm run build:brain"
   },
   "dependencies": {
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "react-scripts": "5.0.1",
-    "axios": "^1.6.0",
-    "recharts": "^2.10.0",
     "electron-is-dev": "^2.0.0"
   },
   "devDependencies": {
@@ -33,7 +25,7 @@
   },
   "build": {
     "appId": "com.jarvis.ai",
-    "productName": "JARVIS",
+    "productName": "Neutron",
     "files": [
       "build/**/*",
       "public/electron.js",
@@ -44,7 +36,10 @@
         "dmg",
         "zip"
       ],
-      "category": "public.app-category.productivity"
+      "category": "public.app-category.productivity",
+      "extendInfo": {
+        "NSMicrophoneUsageDescription": "JARVIS listens for your voice commands."
+      }
     }
   },
   "browserslist": {

@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JARVIS</title>
+<link rel="stylesheet" href="/static/style.css">
+<script type="importmap">
+{
+  "imports": {
+    "three": "/static/vendor/three/three.module.js",
+    "three/addons/": "/static/vendor/three/addons/"
+  }
+}
+</script>
+</head>
+<body class="clean">
+
+<canvas id="sun"></canvas>
+
+<!-- ── Minimal status strip ────────────────────────────────────────── -->
+<header class="status">
+  <span class="pip" id="pip"></span>
+  <span class="label" id="conn">connecting</span>
+  <span class="sep">·</span>
+  <span class="label" id="wake">say something</span>
+  <div class="spacer"></div>
+  <button class="ghost" id="btn-form" title="Switch form (B)">star</button>
+  <button class="ghost" id="btn-chat" title="Chat & read (C)">chat</button>
+  <button class="ghost" id="btn-history" title="Conversation (H)">transcript</button>
+  <button class="ghost" id="btn-settings" title="Settings (,)">settings</button>
+</header>
+
+<!-- ── The conversation lives in the centre, over the star ─────────── -->
+<main class="convo">
+  <div class="you" id="you"></div>
+  <div class="jarvis" id="jarvis"></div>
+  <button class="readmore" id="readmore" hidden>Read it all →</button>
+  <div class="hint" id="hint">Starting the microphone…</div>
+</main>
+
+<!-- ── Voice control ───────────────────────────────────────────────── -->
+<div class="voice">
+  <div class="wave" id="wave" aria-hidden="true"></div>
+
+  <button class="orb" id="orb" aria-label="Hold to speak">
+    <svg viewBox="0 0 24 24" width="30" height="30" aria-hidden="true">
+      <path fill="currentColor" d="M12 14a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v5a3 3 0 0 0 3 3z"/>
+      <path fill="currentColor" d="M18 11a6 6 0 0 1-12 0H4a8 8 0 0 0 7 7.9V22h2v-3.1A8 8 0 0 0 20 11z"/>
+    </svg>
+  </button>
+
+  <form class="type" id="composer">
+    <input id="input" placeholder="or type…" autocomplete="off" spellcheck="false">
+  </form>
+</div>
+
+<!-- ── Chat drawer: full text of everything, and a place to type ──── -->
+<aside class="drawer wide" id="chat">
+  <div class="drawer-head">
+    <span>Conversation</span>
+    <div>
+      <button class="ghost" id="chat-speak" title="Read the last reply aloud">replay</button>
+      <button class="ghost" id="chat-close">close</button>
+    </div>
+  </div>
+  <div class="drawer-body" id="chatlog"></div>
+  <form class="chatbar" id="chatform">
+    <input id="chatinput" placeholder="Type to JARVIS…" autocomplete="off">
+    <button type="submit" class="btn primary">Send</button>
+  </form>
+</aside>
+
+<!-- ── Transcript drawer ───────────────────────────────────────────── -->
+<aside class="drawer" id="drawer">
+  <div class="drawer-head">
+    <span>Conversation</span>
+    <button class="ghost" id="drawer-close">close</button>
+  </div>
+  <div class="drawer-body" id="transcript"></div>
+</aside>
+
+<!-- ── Settings drawer ─────────────────────────────────────────────── -->
+<aside class="drawer right" id="settings">
+  <div class="drawer-head">
+    <span>Settings</span>
+    <button class="ghost" id="settings-close">close</button>
+  </div>
+  <div class="drawer-body">
+
+    <section class="grp">
+      <h3>Voice</h3>
+      <label class="opt">
+        <input type="checkbox" id="opt-speak" checked>
+        <span>Speak replies aloud</span>
+      </label>
+      <label class="opt">
+        <input type="checkbox" id="opt-continuous">
+        <span>Keep listening after each reply</span>
+      </label>
+      <label class="opt col">
+        <span>Speaking rate <b id="rate-val">1.05</b></span>
+        <input type="range" id="opt-rate" min="0.6" max="1.6" step="0.05" value="1.05">
+      </label>
+      <label class="opt col">
+        <span>Voice</span>
+        <select id="opt-voice"></select>
+      </label>
+    </section>
+
+    <section class="grp">
+      <h3>Brain</h3>
+      <div class="sys" id="brain"></div>
+      <button class="ghost wide" id="btn-learn">run a learning cycle</button>
+    </section>
+
+    <section class="grp">
+      <h3>System</h3>
+      <div class="sys" id="sys"></div>
+    </section>
+
+    <section class="grp collapsed" id="grp-sim">
+      <h3 class="toggle" id="sim-toggle">Star appearance <span class="chev">▾</span></h3>
+      <div class="sliders" id="sliders"></div>
+    </section>
+
+  </div>
+</aside>
+
+<div class="toast" id="toast"></div>
+
+<script type="module" src="/static/app.js"></script>
+</body>
+</html>

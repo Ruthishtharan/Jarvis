@@ -5,8 +5,13 @@ Routes the chat call through whichever LLM provider is configured:
   • LLM_PROVIDER=groq   → Groq cloud API (fast, default)
   • LLM_PROVIDER=ollama → local Ollama server (private, offline, free)
 
-Both providers share the same `chat(user_message) -> str` surface so the
-`conversation` skill doesn't care which one is active.
+Both providers share the same `chat(user_message, lang_code) -> str` surface so
+the conversation skill doesn't care which one is active.  `lang_code` is a
+BCP-47 tag (e.g. "ta-IN", "fr-FR") that steers the reply language.
+
+The skill path (`skills/conversation.py`) uses this engine, so adding
+`lang_code` here fixes multi-language replies for both the voice loop AND the
+web/API frontend.
 """
 
 from __future__ import annotations
@@ -17,7 +22,6 @@ from typing import Callable, Iterator, Optional
 from ai.memory import ConversationMemory
 from config import settings
 from config.constants import SYSTEM_PROMPT
-
 
 # ── Capability grounding ─────────────────────────────────────────────────────
 # Without this the model had no idea what Jarvis can actually do, so it
@@ -75,10 +79,102 @@ def _capability_block() -> str:
         "punctuation. Write in plain spoken sentences."
     )
     return _capabilities_cache
+
+
+# Claims the conversation engine is structurally incapable of making truthfully.
+#
+# This engine has no tools. It talks, and nothing else — every real action goes
+# through a skill, and a skill that ran would have answered instead of this.
+# So a first-person "I sent it" from here is false 100% of the time, not
+# occasionally.
+#
+# The system prompt already says "Never claim an action succeeded unless you
+# actually performed it." The model said "Message sent to Aki on WhatsApp: Hi"
+# anyway, and Ruthish believed it — the message was never sent. That is the
+# lesson: an instruction is a request, not a guarantee. The capability list
+# tells the model JARVIS *can* send WhatsApp messages, and the model does not
+# distinguish "JARVIS can" from "I just did".
+#
+# So the check is structural, where it cannot be talked around.
+_FALSE_ACTION_CLAIM = re.compile(
+    r"(?i)("
+    r"\bmessage\s+sent\b"
+    r"|\bi(?:'ve|\s+have)?\s+(?:just\s+)?"
+    r"(?:sent|messaged|texted|pinged|emailed|whatsapp(?:ed)?|notified)\b"
+    r"|\bsent\s+(?:your|the|a)\s+message\b"
+    r"|\bi(?:'ve|\s+have)?\s+(?:just\s+)?(?:opened|launched|started|played)\s"
+    # Present progressive at the start of the reply. The past-tense patterns
+    # above missed "Opening Obsidian... Obsidian's up and running." entirely,
+    # and it was just as false — nothing opened. Anchored to the start so an
+    # explanatory sentence ("opening a vault in Obsidian works like…") is not
+    # caught.
+    # The negative lookahead separates a claim from an explanation: "Opening
+    # Obsidian" and "Opening the Obsidian app" are claims; "Opening a vault in
+    # Obsidian works by…" is describing how something is done. An indefinite
+    # article after the verb is the tell.
+    r"|^\s*(?:opening|launching|starting|playing|pausing|sending|messaging)"
+    r"\s+(?!a\s|an\s)\w"
+    # "X is up and running" / "X is now open" — completion by another name.
+    r"|\bis\s+(?:now\s+)?(?:up\s+and\s+running|open|running|launched)\b"
+    r")"
+)
+
+
+def _strip_false_claim(reply: str, user_message: str) -> str | None:
+    """Return a replacement when the model claims to have done something.
+
+    None means the reply is fine. The replacement names the real phrasing that
+    would work, so the turn is still useful rather than just a refusal.
+    """
+    if not reply or not _FALSE_ACTION_CLAIM.search(reply):
+        return None
+    logger.warning(
+        f"conversation engine claimed an action it cannot perform: {reply[:80]!r}")
+    if "whatsapp" in user_message.lower() or "whatsapp" in reply.lower():
+        return ("I didn't actually send that — I can only send WhatsApp "
+                "messages when you phrase it as a command, like: message Aki "
+                "on WhatsApp saying Hi.")
+    return ("I didn't actually do that. I can only act when a request matches "
+            "one of my skills — say it as a direct command and I'll run it.")
+
+
+def _language_clause(lang_code: str) -> str:
+    """Instruction that makes the model reply in the target language.
+
+    Without this, non-English replies fail silently: the model answers in
+    English because nothing told it otherwise.  The instruction is explicit
+    that this is a WRITING task — told to "reply in Tamil, spoken-sounding"
+    the model previously decided it was being asked to synthesise audio and
+    refused with "I can't generate spoken Tamil audio directly".
+    """
+    if not lang_code or lang_code.lower().startswith("en"):
+        return ""
+    # Use the human-readable language name from the LANGUAGES registry when
+    # available, falling back to the code itself.
+    try:
+        from conversation.languages import by_tag
+        lang = by_tag(lang_code) or by_tag(lang_code.split("-")[0])
+        name = lang.name if lang else lang_code
+    except Exception:
+        name = lang_code
+    return (
+        f"\n\nWRITE your reply in {name}, using {name} script. "
+        f"You are producing TEXT — a separate text-to-speech "
+        f"system will read it aloud, so never say you cannot "
+        f"speak, pronounce, or generate audio in {name}. "
+        f"Just answer the question in {name}. "
+        f"Keep it short and conversational."
+    )
+
+
 from utils.logger import get_logger
 
 # Sentence boundary: end-punct followed by whitespace OR end-of-string.
-_SENTENCE_END = re.compile(r"([\.\!\?]+)(\s+|$)")
+# Inside a character class `.` `!` `?` are literal, so they need no
+# escaping. The doubled form matched a literal backslash and required
+# the two characters "\s" rather than whitespace — so sentences only
+# flushed at end-of-string and streaming TTS never fired mid-reply.
+_SENTENCE_END = re.compile(r"([.!?]+)(\s+|$)")
 # Minimum chars before we'll flush a sentence — avoids speaking "Oh." alone
 # while a longer continuation is still streaming in.
 _MIN_FLUSH_CHARS = 12
@@ -93,16 +189,68 @@ _OFFLINE_REPLY = (
 )
 
 
+def _explain_failure(exc: Exception) -> str | None:
+    """Turn a provider exception into something worth saying out loud."""
+    msg = str(exc)
+    if "rate_limit" in msg or "413" in msg or "too large" in msg.lower():
+        return ("That request was too big for my current rate limit. "
+                "I've trimmed the conversation — try again.")
+    if "401" in msg or "invalid_api_key" in msg:
+        return "My API key is being rejected. It probably needs rotating."
+    if "429" in msg:
+        return "I'm being rate limited. Give it a moment."
+    return None
+
+
 class ConversationEngine:
-    def __init__(self, memory: ConversationMemory):
+    def __init__(self, memory: ConversationMemory, default_lang: str = "en"):
         self._memory = memory
         self._groq = None
         self._ollama = None
+        self._last_error_message: str | None = None
+        self._default_lang = default_lang
 
     # ── Public ───────────────────────────────────────────────────────────────
 
-    def chat(self, user_message: str) -> str:
+    def chat(self, user_message: str, context: str | None = None,
+             lang_code: str = "en") -> str:
+        """Answer `user_message` in the language given by `lang_code`.
+
+        `context` is retrieval material for THIS TURN ONLY. It is injected
+        into the request but never written to memory — that distinction is
+        load-bearing. Retrieved context was previously prepended to the
+        user message, so every turn stored ~3,500 characters of documents
+        forever. Twenty turns later the history alone was 9,272 tokens and
+        every request hit Groq's 8,000 TPM ceiling with HTTP 413.
+        """
         self._memory.add("user", user_message)
+        self._pending_context = context
+
+        # Short social turns go to the local persona LoRA — ~0.4s and offline,
+        # against ~1.3s for a cloud round trip that needed no knowledge.
+        #
+        # This lives here rather than in ConversationSkill because the skill
+        # bids confidence 0.05, below web/server.py's MEDIUM=0.60 gate, so the
+        # server never calls it — it reaches this engine directly. A router
+        # placed in the skill is dead code for every web and voice request.
+        #
+        # Note `context` is deliberately NOT consulted. The first version
+        # skipped the LoRA whenever retrieval had returned anything, assuming
+        # a hit meant the turn needed documents. It does not: nearest-neighbour
+        # search always returns its nearest neighbours, relevant or not, so
+        # "nice work" pulled 2,417 characters of notes and "good morning"
+        # 1,633. That guard silently disabled the router for four turns in six.
+        #
+        # The allowlist is the authority. If a turn is literally "thanks", a
+        # retrieval hit is noise and the documents are dropped unused.
+        from ai import local_persona
+        if local_persona.is_social(user_message, lang_code):
+            local = local_persona.reply(user_message)
+            if local:
+                logger.info(f"persona LoRA handled: {user_message[:40]!r}")
+                self._memory.add("assistant", local)
+                return local
+
         if not settings.has_ai():
             self._memory.add("assistant", _OFFLINE_REPLY)
             return _OFFLINE_REPLY
@@ -110,12 +258,27 @@ class ConversationEngine:
         provider = settings.LLM_PROVIDER
         try:
             if provider == "ollama":
-                reply = self._chat_ollama(user_message)
+                reply = self._chat_ollama(user_message, lang_code)
             else:
-                reply = self._chat_groq(user_message)
+                reply = self._chat_groq(user_message, lang_code)
         except Exception as e:
             logger.error(f"{provider} chat error: {e}")
-            return self._provider_failure_message(provider)
+            self._last_error_message = _explain_failure(e)
+            from ai.llm_fallback import try_fallbacks
+            messages = [
+                {"role": "system",
+                 "content": SYSTEM_PROMPT + _capability_block()
+                 + _language_clause(lang_code)}
+            ] + self._build_history(self._last_user_message())
+            reply = try_fallbacks(messages)
+            if not reply:
+                return self._provider_failure_message(provider)
+            logger.info("Recovered via LLM fallback chain")
+
+        # Last line of defence: never let a fabricated success reach the user.
+        replacement = _strip_false_claim(reply, user_message)
+        if replacement is not None:
+            reply = replacement
 
         self._memory.add("assistant", reply)
         return reply
@@ -124,6 +287,7 @@ class ConversationEngine:
         self,
         user_message: str,
         on_sentence: Callable[[str], None],
+        lang_code: str = "en",
     ) -> str:
         """Stream a reply from the LLM, calling `on_sentence(sentence)` as
         each complete sentence is detected.  Returns the full assembled
@@ -139,31 +303,75 @@ class ConversationEngine:
 
         provider = settings.LLM_PROVIDER
         if provider != "groq":
-            # Ollama path — no streaming yet, just speak the whole reply once.
-            reply = self.chat(user_message)
+            reply = self.chat(user_message, lang_code=lang_code)
             on_sentence(reply)
-            # `chat()` already appended both user+assistant, so undo the
-            # duplicate user-message we added at the top of this method.
-            history = self._memory.get_history()
-            if len(history) >= 2 and history[-2]["role"] == "user" \
-                    and history[-2]["content"] == user_message \
-                    and history[-3:-2] and history[-3]["role"] == "user":
-                # Only happens if `chat()` re-added user — defensive no-op
-                pass
             return reply
 
+        spoken: list[str] = []
+
+        def _tracked(sentence: str) -> None:
+            spoken.append(sentence)
+            on_sentence(sentence)
+
         try:
-            return self._stream_groq(on_sentence)
+            return self._stream_groq(_tracked, lang_code)
         except Exception as e:
             logger.error(f"Groq streaming error: {e}")
+
+            if not spoken:
+                from ai.llm_fallback import try_fallbacks
+                messages = [
+                    {"role": "system",
+                     "content": SYSTEM_PROMPT + _capability_block()
+                     + _language_clause(lang_code)}
+                ] + self._build_history(self._last_user_message())
+                reply = try_fallbacks(messages)
+                if reply:
+                    logger.info("Recovered via LLM fallback chain (stream)")
+                    self._memory.add("assistant", reply)
+                    on_sentence(reply)
+                    return reply
+            else:
+                partial = " ".join(spoken).strip()
+                logger.warning(
+                    f"Groq stream died after {len(spoken)} sentence(s); "
+                    "keeping the partial reply")
+                recovery = "Sorry — I lost my train of thought there."
+                on_sentence(recovery)
+                self._memory.add("assistant", f"{partial} {recovery}".strip())
+                return f"{partial} {recovery}".strip()
+
             fallback = self._provider_failure_message("groq")
             self._memory.add("assistant", fallback)
             on_sentence(fallback)
             return fallback
 
-    def _stream_groq(self, on_sentence: Callable[[str], None]) -> str:
+    def _stream_groq(self, on_sentence: Callable[[str], None],
+                     lang_code: str = "en") -> str:
         client = self._get_groq()
-        messages = [{"role": "system", "content": SYSTEM_PROMPT + _capability_block()}] + self._build_history(self._last_user_message())
+        system = SYSTEM_PROMPT + _capability_block()
+        ctx = getattr(self, "_pending_context", None)
+        if ctx:
+            system += "\n\nCONTEXT FOR THIS QUESTION ONLY\n" + ctx
+
+        messages = [{"role": "system", "content": system}] \
+            + self._build_history(self._last_user_message())
+
+        # The language instruction goes on the LAST USER MESSAGE, not in the
+        # system prompt — and only in the outgoing request, never in memory.
+        #
+        # Placement is not cosmetic. With the clause in the system message,
+        # Tamil, Hindi and Japanese still complied but Kannada and Malayalam
+        # answered in English: a system-level instruction carries less weight
+        # for lower-resource languages than one sitting immediately before the
+        # question. Appending here gives recency without the ~350 characters
+        # accumulating in conversation history every single turn.
+        clause = _language_clause(lang_code)
+        if clause and messages and messages[-1].get("role") == "user":
+            messages = messages[:-1] + [{
+                "role": "user",
+                "content": messages[-1]["content"] + clause,
+            }]
         stream = client.chat.completions.create(
             model=settings.GROQ_CHAT_MODEL,
             messages=messages,
@@ -184,7 +392,6 @@ class ConversationEngine:
                 continue
             buffer += delta
             full += delta
-            # Flush any complete sentences sitting in the buffer.
             while True:
                 m = _SENTENCE_END.search(buffer)
                 if not m:
@@ -192,11 +399,10 @@ class ConversationEngine:
                 end = m.end()
                 sentence = buffer[:end].strip()
                 if len(sentence) < _MIN_FLUSH_CHARS:
-                    break  # wait for more — don't flush a tiny fragment yet
+                    break
                 on_sentence(sentence)
                 buffer = buffer[end:]
 
-        # Flush any tail (no trailing punctuation, but the model is done)
         tail = buffer.strip()
         if tail:
             on_sentence(tail)
@@ -207,9 +413,31 @@ class ConversationEngine:
 
     # ── Provider-specific ────────────────────────────────────────────────────
 
-    def _chat_groq(self, _user_message: str) -> str:
+    def _chat_groq(self, _user_message: str, lang_code: str = "en") -> str:
         client = self._get_groq()
-        messages = [{"role": "system", "content": SYSTEM_PROMPT + _capability_block()}] + self._build_history(self._last_user_message())
+        system = SYSTEM_PROMPT + _capability_block()
+        ctx = getattr(self, "_pending_context", None)
+        if ctx:
+            system += "\n\nCONTEXT FOR THIS QUESTION ONLY\n" + ctx
+
+        messages = [{"role": "system", "content": system}] \
+            + self._build_history(self._last_user_message())
+
+        # The language instruction goes on the LAST USER MESSAGE, not in the
+        # system prompt — and only in the outgoing request, never in memory.
+        #
+        # Placement is not cosmetic. With the clause in the system message,
+        # Tamil, Hindi and Japanese still complied but Kannada and Malayalam
+        # answered in English: a system-level instruction carries less weight
+        # for lower-resource languages than one sitting immediately before the
+        # question. Appending here gives recency without the ~350 characters
+        # accumulating in conversation history every single turn.
+        clause = _language_clause(lang_code)
+        if clause and messages and messages[-1].get("role") == "user":
+            messages = messages[:-1] + [{
+                "role": "user",
+                "content": messages[-1]["content"] + clause,
+            }]
         response = client.chat.completions.create(
             model=settings.GROQ_CHAT_MODEL,
             messages=messages,
@@ -219,21 +447,17 @@ class ConversationEngine:
         )
         return (response.choices[0].message.content or "").strip()
 
-    def _chat_ollama(self, _user_message: str) -> str:
+    def _chat_ollama(self, _user_message: str, lang_code: str = "en") -> str:
         client = self._get_ollama()
-        messages = [{"role": "system", "content": SYSTEM_PROMPT + _capability_block()}] + self._build_history(self._last_user_message())
+        system = SYSTEM_PROMPT + _capability_block() + _language_clause(lang_code)
+        messages = [{"role": "system", "content": system}] \
+            + self._build_history(self._last_user_message())
         return client.chat(messages, max_tokens=512, temperature=0.7)
 
     # ── Helpers ──────────────────────────────────────────────────────────────
 
     def _last_user_message(self) -> str:
-        """The most recent user turn, used as the retrieval query.
-
-        Read from history rather than passed in: the three call sites have
-        inconsistent signatures (`_user_message`, and none at all for the
-        streaming path), and the last user turn is already recorded by the
-        time any of them run.
-        """
+        """The most recent user turn, used as the retrieval query."""
         try:
             for msg in reversed(self._memory.get_history()):
                 if msg.get("role") == "user":
@@ -242,34 +466,28 @@ class ConversationEngine:
             pass
         return ""
 
+    _HISTORY_CHAR_BUDGET = 6000
+
+    def _trim_history(self, history: list[dict]) -> list[dict]:
+        kept: list[dict] = []
+        total = 0
+        for msg in reversed(history):
+            size = len(msg.get("content", ""))
+            if kept and total + size > self._HISTORY_CHAR_BUDGET:
+                break
+            kept.append(msg)
+            total += size
+        return list(reversed(kept))
+
     def _build_history(self, query: str = "") -> list[dict]:
-        """Recent turns, plus anything older that is relevant to `query`.
-
-        The sliding window keeps the last N turns and DROPS the rest, so
-        "what did I say about the deadline?" fails the moment that turn ages
-        out — the information is gone from context even though it is still on
-        disk in the events table.
-
-        GPT-6 Astra's Codex integration handles the same problem by keeping
-        earlier context searchable instead of compressing it into a single
-        lossy summary. The same idea applies here, and cheaply: every handled
-        command is already logged to SQLite with an FTS5 index. So rather than
-        discarding aged-out turns, we retrieve the relevant ones on demand.
-
-        Cost is bounded: a local FTS5 query and at most a few hundred extra
-        tokens, only when something actually matches.
-        """
         recent = [
             {"role": msg["role"], "content": msg["content"]}
             for msg in self._memory.get_history()
         ]
-
+        recent = self._trim_history(recent)
         recalled = self._recall_relevant(query, recent)
         if not recalled:
             return recent
-
-        # Injected as a system message so the model treats it as reference
-        # material rather than as something the user just said.
         return [{
             "role": "system",
             "content": (
@@ -279,16 +497,12 @@ class ConversationEngine:
             ),
         }] + recent
 
-    # How many aged-out exchanges to pull back in, and the shortest query
-    # worth searching on — single words match far too broadly to be useful.
     _RECALL_LIMIT = 3
     _MIN_QUERY_WORDS = 2
 
     def _recall_relevant(self, query: str, recent: list[dict]) -> str:
-        """Search past events for exchanges not already in the window."""
         if not query or len(query.split()) < self._MIN_QUERY_WORDS:
             return ""
-
         try:
             from memory import get_memory as _get_store
             store = _get_store()
@@ -296,11 +510,7 @@ class ConversationEngine:
         except Exception as e:
             logger.debug(f"memory recall failed: {e}")
             return ""
-
-        # Skip anything already visible in the recent window; repeating it
-        # wastes context and can make the model think it happened twice.
         seen = {m["content"].strip().lower() for m in recent}
-
         lines = []
         for user_text, reply_text in rows:
             if user_text.strip().lower() in seen:
@@ -311,7 +521,6 @@ class ConversationEngine:
             lines.append(f"- You asked: {user_text.strip()}\n  I answered: {snippet}")
             if len(lines) >= self._RECALL_LIMIT:
                 break
-
         return "\n".join(lines)
 
     def _get_groq(self):
@@ -333,4 +542,5 @@ class ConversationEngine:
                 "Try running `ollama serve` and `ollama pull "
                 f"{settings.OLLAMA_MODEL}`."
             )
-        return "I'm having trouble reaching Groq right now. Check your API key and internet connection."
+        return self._last_error_message or (
+            "I'm having trouble reaching Groq right now.")

@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JARVIS Brain</title>
+<link rel="stylesheet" href="/static/style.css">
+<link rel="stylesheet" href="/static/brain.css">
+<script type="importmap">
+{
+  "imports": {
+    "three": "/static/vendor/three/three.module.js",
+    "three/addons/": "/static/vendor/three/addons/"
+  }
+}
+</script>
+</head>
+<body class="brainapp">
+
+<canvas id="sun"></canvas>
+
+<header class="bhead">
+  <div class="btitle">
+    <span class="pip" id="pip"></span>
+    <h1>JARVIS BRAIN</h1>
+    <span class="sub" id="conn">connecting</span>
+  </div>
+  <nav class="btabs">
+    <button class="btab active" data-tab="mind">Mind</button>
+    <button class="btab" data-tab="voice">Voice</button>
+    <button class="btab" data-tab="memory">Memory</button>
+    <button class="btab" data-tab="skills">Skills</button>
+    <button class="btab" data-tab="appearance">Appearance</button>
+    <button class="btab" data-tab="system">System</button>
+  </nav>
+</header>
+
+<main class="bpanel">
+
+  <!-- ── Mind: learning + autonomy ─────────────────────────────────── -->
+  <section class="bpane active" data-pane="mind">
+    <h2>Learning</h2>
+    <div class="stats" id="brain-stats"></div>
+
+    <div class="actions">
+      <button class="btn primary" id="btn-learn">Run a learning cycle</button>
+      <button class="btn" id="btn-refresh">Refresh</button>
+    </div>
+
+    <p class="note">
+      Each cycle harvests your conversations, retrains the local intent router,
+      evaluates it on unseen phrasings, and <b>only promotes the new model if it
+      beats the current one</b>. A loop that always promotes walks itself
+      downhill. It never trains on its own predictions — only on commands the
+      regex tier matched, which are free ground truth.
+    </p>
+
+    <h2>Cycle history</h2>
+    <div class="list" id="cycles"></div>
+  </section>
+
+  <!-- ── Voice ─────────────────────────────────────────────────────── -->
+  <section class="bpane" data-pane="voice">
+    <h2>Language</h2>
+    <label class="opt col"><span>Speak and listen in</span>
+      <select id="opt-lang"></select></label>
+    <label class="opt"><input type="checkbox" id="opt-anylang" checked>
+      <span>Wake in any language<em>Accepts "Jarvis" in every supported script, not just the selected one — useful if you code-switch mid-sentence.</em></span></label>
+    <p class="note">The recogniser can only run one language model at a time,
+      so the selection genuinely changes what JARVIS can hear. Replies come
+      back in the same language.</p>
+
+    <h2>Listening</h2>
+    <label class="opt"><input type="checkbox" id="opt-continuous" checked>
+      <span>Always listening<em>JARVIS keeps the mic open and transcribes everything, continuously.</em></span></label>
+    <label class="opt"><input type="checkbox" id="opt-wake" checked>
+      <span>Only act when named<em>Hears everything, but does nothing unless you say "Jarvis". Turn this off and it acts on every sentence.</em></span></label>
+    <label class="opt"><input type="checkbox" id="opt-clap" checked>
+      <span>Clap to wake<em>One or two claps arm JARVIS for the next sentence, so you needn't say the name.</em></span></label>
+    <label class="opt"><input type="checkbox" id="opt-speak" checked>
+      <span>Speak replies aloud<em>Uses the browser voice, so it never fights the desktop TTS.</em></span></label>
+
+    <h2>Speech</h2>
+    <label class="opt col"><span>Speaking rate <b id="rate-val">1.05</b></span>
+      <input type="range" id="opt-rate" min="0.6" max="1.6" step="0.05" value="1.05"></label>
+    <label class="opt col"><span>Voice</span>
+      <select id="opt-voice"></select></label>
+    <div class="actions">
+      <button class="btn" id="btn-test-voice">Test voice</button>
+    </div>
+
+    <h2>Engines</h2>
+    <div class="stats" id="voice-stats"></div>
+  </section>
+
+  <!-- ── Memory ────────────────────────────────────────────────────── -->
+  <section class="bpane" data-pane="memory">
+    <h2>Remembered facts</h2>
+    <form class="inline" id="fact-form">
+      <input id="fact-input" placeholder="Teach JARVIS something…" maxlength="500">
+      <button class="btn primary" type="submit">Store</button>
+    </form>
+    <div class="list" id="facts"></div>
+
+    <h2>Conversation history</h2>
+    <input class="search" id="search" placeholder="Search conversations…">
+    <div class="list" id="turns"></div>
+  </section>
+
+  <!-- ── Skills ────────────────────────────────────────────────────── -->
+  <section class="bpane" data-pane="skills">
+    <h2>Skills <span class="count" id="skill-count"></span></h2>
+    <p class="note">Everything JARVIS can actually do. Anything outside this
+      list it will tell you it cannot do, rather than pretending.</p>
+    <div class="list" id="skills"></div>
+  </section>
+
+  <!-- ── Appearance ────────────────────────────────────────────────── -->
+  <section class="bpane" data-pane="appearance">
+    <h2>Form</h2>
+    <div class="actions">
+      <button class="btn" id="btn-form-star">Stellar</button>
+      <button class="btn primary" id="btn-form-brain">Cortical</button>
+    </div>
+
+    <h2>Star</h2>
+    <div class="sliders" id="sliders-star"></div>
+
+    <h2>Brain</h2>
+    <div class="sliders" id="sliders-brain"></div>
+  </section>
+
+  <!-- ── System ────────────────────────────────────────────────────── -->
+  <section class="bpane" data-pane="system">
+    <h2>Status</h2>
+    <div class="stats" id="sys"></div>
+
+    <h2>Language model</h2>
+    <div class="stats" id="llm"></div>
+    <p class="note" id="llm-note"></p>
+
+    <h2>Diagnostics</h2>
+    <div class="actions">
+      <button class="btn" id="btn-ping">Test a command</button>
+      <button class="btn" id="btn-export">Export session</button>
+    </div>
+    <pre class="out" id="diag"></pre>
+  </section>
+
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script type="module" src="/static/brain-app.js"></script>
+</body>
+</html>

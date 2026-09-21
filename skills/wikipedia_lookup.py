@@ -52,6 +52,15 @@ _PATTERNS = [
 
 _TAIL = re.compile(r"\s+(?:please|jarvis|for me)\s*$")
 
+# Open-ended questions that parse as lookups but aren't. Wikipedia does have a
+# "Meaning of life" article, but reading an encyclopedia entry aloud is a worse
+# answer than actually talking about it — so these go to conversation instead.
+# Matched against the extracted topic, kept deliberately small.
+_PHILOSOPHICAL_TOPICS = {
+    "meaning of life", "the meaning of life", "point of it all",
+    "meaning of everything", "purpose of life", "meaning of existence",
+}
+
 
 class WikipediaSkill(Skill):
     name = "wikipedia_lookup"
@@ -70,7 +79,12 @@ class WikipediaSkill(Skill):
 
         m = _PATTERNS[1].search(low)
         if m:
-            return SkillMatch(confidence=0.88, entities={"topic": self._clean(m.group(1))})
+            # Demoted from 0.88. "Who is X" is a research question, not a
+            # request to recite one encyclopedia entry — it now routes to the
+            # research skill, which reads five sources and answers in its own
+            # words. Saying "search Wikipedia for X" explicitly still lands
+            # here at 0.95.
+            return SkillMatch(confidence=0.50, entities={"topic": self._clean(m.group(1))})
 
         # Weaker forms — sit below the 0.85 threshold so the LLM tie-breaker
         # can hand these to coding_assistant or conversation instead.
@@ -78,6 +92,8 @@ class WikipediaSkill(Skill):
             m = pat.search(low)
             if m:
                 topic = self._clean(m.group(1))
+                if topic in _PHILOSOPHICAL_TOPICS:
+                    return None  # let conversation take it
                 if len(topic) > 2:
                     return SkillMatch(confidence=0.55, entities={"topic": topic})
 

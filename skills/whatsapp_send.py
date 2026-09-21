@@ -26,7 +26,27 @@ _PATTERNS = [
     (re.compile(r"tell\s+(.+?)\s+(?:on\s+whatsapp\s+)?(?:saying\s+|that\s+)(.+)"), False),
     # "send Hello to John" — only when WhatsApp is mentioned; groups reversed
     (re.compile(r"send\s+(.+?)\s+to\s+(\w+)\s*$"), True),
+    # "ping Aki Hi" / "msg Aki hi" / "dm Aki hi" — verb, contact, message with
+    # no connector word at all. This is how people actually talk, and nothing
+    # above matched it: every pattern needed "saying", "that", or a trailing
+    # "to <name>". "ping Aki Hi on WhatsApp?" matched nothing, fell through to
+    # the conversation engine, and the LLM announced it had sent a message
+    # that was never sent.
+    # Contact is a single word here on purpose — without a connector there is
+    # nothing to mark where the name ends, and "ping Aki how are you" must not
+    # read the contact as "Aki how are".
+    (re.compile(r"(?:ping|msg|dm|whatsapp|message|text)\s+(\w+)\s+(.+)"), False),
 ]
+
+# Trailing platform tag and punctuation. The patterns anchor on $ or consume
+# the rest of the line, so "on WhatsApp?" at the end either broke the anchor or
+# got swallowed into the message body — the same bug that made the music skill
+# search Spotify for "lose my mind on spotify?".
+# Matches anywhere, not just at the end. "message Aki on WhatsApp saying I am
+# late" puts the platform tag in the middle, and a trailing-only strip left the
+# contact as "aki on whatsapp". A leading bare "whatsapp Aki hi" is untouched
+# because this requires a preposition in front.
+_PLATFORM = re.compile(r"\s+(?:on|in|via|over|through)\s+whats\s*app\b", re.I)
 
 
 class WhatsAppSendSkill(Skill):
@@ -50,6 +70,9 @@ class WhatsAppSendSkill(Skill):
         low = text.lower()
         if not self._is_whatsapp_utterance(low):
             return None
+        # Strip "on WhatsApp" and trailing punctuation before matching, so the
+        # platform tag never lands inside the contact or the message.
+        low = _PLATFORM.sub(" ", low).strip(" .!?,")
         for pattern, reversed_groups in _PATTERNS:
             m = pattern.search(low)
             if not m:

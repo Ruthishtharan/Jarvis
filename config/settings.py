@@ -28,7 +28,10 @@ GROQ_FAST_MODEL = os.getenv("GROQ_FAST_MODEL", "qwen/qwen3.8-27b")
 
 # ── Ollama (local LLM) ───────────────────────────────────────────────────────
 OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://127.0.0.1:11434")
-OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.1:8b")
+# Default is 3B, not 8B: this runs on an 8 GB M1 Air where macOS already holds
+# most of the unified memory. An 8B model swaps to disk and takes far longer
+# than the fallback timeout allows. Override in .env if you have the headroom.
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.2:3b")
 
 # ── Voice ─────────────────────────────────────────────────────────────────────
 WAKE_WORD = os.getenv("JARVIS_WAKE_WORD", "jarvis")

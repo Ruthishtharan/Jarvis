@@ -28,7 +28,7 @@ $ python (C) SETUP_V1.py
 Answer YES to startup daemon (recommended).
 
 What it does:
-  • Installs web search library (duckduckgo-search)
+  • Installs web search library (ddgs)
   • Installs macOS integration (PyObjC)
   • Creates ~/.jarvis/ config directory
   • Tests all features
@@ -163,7 +163,7 @@ TOTAL TIME: ~25 minutes
 ───────────────────────────────────────────────────────────────────────────────
 
 "Web search not working"
-→ Run: pip install duckduckgo-search
+→ Run: pip install ddgs
 → Restart JARVIS
 
 "Menu bar app crashes"

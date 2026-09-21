@@ -14,10 +14,28 @@ class TestTextToSpeech(unittest.TestCase):
 
     @patch("subprocess.Popen")
     def test_speak_calls_say(self, mock_popen):
+        """The macOS `say` path must still work.
+
+        The engine is injected explicitly rather than left to `build_engine()`,
+        which reads TTS_ENGINE from the developer's own .env. As written
+        originally this passed for whoever had TTS_ENGINE=say and failed for
+        anyone on elevenlabs — a test that depends on local config is testing
+        the config, not the code.
+        """
+        from voice.speech_engines import MacSayEngine
+        from config import settings
+        # Positional, not keyword. This constructor has been renamed twice
+        # (voice/rate -> default_voice/default_rate -> back again) and the
+        # test broke both times. The test cares that `say` gets invoked, not
+        # what the parameters are called this week.
+        tts = TextToSpeech(
+            engine=MacSayEngine(settings.TTS_VOICE, settings.TTS_RATE)
+        )
+
         mock_proc = MagicMock()
         mock_proc.wait.return_value = 0
         mock_popen.return_value = mock_proc
-        self.tts.speak("Hello world")
+        tts.speak("Hello world")
         mock_popen.assert_called_once()
         args = mock_popen.call_args[0][0]
         self.assertIn("say", args)

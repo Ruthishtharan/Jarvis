@@ -133,6 +133,11 @@ SILENCE_PAD = b"\x00" * int(SAMPLE_RATE * 0.04) * 2
 REQUEST_TIMEOUT = 30
 CONNECT_TIMEOUT = 6
 
+# How long speak() will wait for the startup warm-up before going ahead anyway.
+# Long enough to cover a normal handshake + first synthesis, short enough that
+# a dead network costs this once rather than on every utterance.
+WARM_WAIT_SEC = 4.0
+
 
 class ElevenLabsEngine(SpeechEngine):
     name = "elevenlabs"
@@ -148,6 +153,17 @@ class ElevenLabsEngine(SpeechEngine):
         self._audio = None       # lazy PyAudio instance
         self._stream = None
         self._lock = threading.Lock()
+
+        # "Is it safe to use the network yet?" speak() waits on this.
+        #
+        # Starts SET — i.e. nothing to wait for. Only build_engine(), which
+        # actually launches a warm-up thread, clears it first. An engine
+        # constructed directly (warm_voice_cache.py, tests) therefore never
+        # stalls: if nobody is warming, there is nothing to wait for, and a
+        # default of "not ready" would have made every such utterance pay the
+        # full WARM_WAIT_SEC for a warm-up that was never coming.
+        self.warm_ready = threading.Event()
+        self.warm_ready.set()
 
         # Persistent connection. Without this every utterance pays a fresh
         # DNS lookup and TLS handshake — measured at 4.7s cold versus ~450ms
@@ -198,6 +214,36 @@ class ElevenLabsEngine(SpeechEngine):
             return (time.perf_counter() - t0) * 1000
         except Exception as e:
             logger.debug(f"connection warm-up failed: {e}")
+            return None
+
+    def warm_synthesis(self) -> float | None:
+        """Make one real synthesis round-trip so the first spoken line doesn't.
+
+        `warm_connection()` only opens a socket to /v1/models. That warms TLS
+        and nothing else: measured, the first real utterance still took 3250ms
+        to first audio against 312ms for the one after it. Sending a genuine
+        synthesis request first brings the first spoken line to ~550ms.
+
+        Deliberately not routed through `warm_cache()`, which skips any phrase
+        already on disk. That would warm the path on the very first launch and
+        then silently stop warming it on every launch afterwards.
+
+        Costs two characters of quota per start. The audio is discarded.
+        """
+        try:
+            t0 = time.perf_counter()
+            resp = self._get_session().post(
+                API_URL.format(voice_id=self.voice_id),
+                params={"output_format": OUTPUT_FORMAT},
+                json={"text": "ok", "model_id": self.model},
+                timeout=(CONNECT_TIMEOUT, REQUEST_TIMEOUT),
+            )
+            if resp.status_code != 200:
+                logger.debug(f"synthesis warm-up HTTP {resp.status_code}")
+                return None
+            return (time.perf_counter() - t0) * 1000
+        except Exception as e:
+            logger.debug(f"synthesis warm-up failed: {e}")
             return None
 
     def _cache_path(self, text: str) -> Path:
@@ -302,6 +348,19 @@ class ElevenLabsEngine(SpeechEngine):
                 return self._play_bytes(data, interrupted)
             except Exception as e:
                 logger.debug(f"TTS cache read failed: {e}")
+
+        # Wait for the startup warm-up before going to the network.
+        #
+        # THIS IS THE ONE THAT MAKES JARVIS SOUND RIGHT. Without it the first
+        # utterance races the TLS handshake: ElevenLabs takes long enough to
+        # look like a failure, FallbackEngine drops to the robotic macOS voice,
+        # and the very first thing JARVIS says every launch is in the wrong
+        # voice. Firing the warm-up thread is not enough — something has to
+        # wait for it.
+        #
+        # Bounded, and only on the network path: a cache hit never waits, and a
+        # dead network costs WARM_WAIT_SEC once rather than hanging.
+        self.warm_ready.wait(timeout=WARM_WAIT_SEC)
 
         return self._stream_and_play(text, cache_file, interrupted)
 
@@ -580,15 +639,33 @@ def build_engine() -> SpeechEngine:
         logger.warning("ElevenLabs engine unavailable — using the system voice")
         return mac
 
-    # Open the TLS connection now, off-thread, so the first spoken line does
-    # not pay the handshake. Cold was measured at 4.7s versus ~450ms warm.
-    threading.Thread(
-        target=lambda: logger.info(
-            f"ElevenLabs connection warm ({eleven.warm_connection() or -1:.0f}ms)"
-        ),
-        daemon=True,
-        name="tts-warmup",
-    ).start()
+    # Warm the connection AND the synthesis path off-thread, so the first
+    # spoken line pays neither. Cold was measured at 4.7s versus ~450ms warm.
+    #
+    # `warm_ready` is the load-bearing part. The previous version started this
+    # thread and never waited on it, so the first utterance raced the handshake
+    # and FallbackEngine dropped to the robotic system voice — the first thing
+    # JARVIS said every launch was in the wrong voice. speak() now waits.
+    #
+    # `finally` matters too: if warm-up throws, the event must still be set or
+    # every utterance would block for the full WARM_WAIT_SEC.
+    # Mark not-ready before the thread starts, so speak() cannot slip past the
+    # gate in the window between launching the thread and it doing any work.
+    eleven.warm_ready.clear()
+
+    def _warm() -> None:
+        try:
+            ms = eleven.warm_connection()
+            logger.info(f"ElevenLabs connection warm ({ms or -1:.0f}ms)")
+            ms2 = eleven.warm_synthesis()
+            if ms2 is not None:
+                logger.info(f"ElevenLabs synthesis warm ({ms2:.0f}ms)")
+        except Exception as exc:
+            logger.warning(f"ElevenLabs warm-up failed: {exc}")
+        finally:
+            eleven.warm_ready.set()
+
+    threading.Thread(target=_warm, daemon=True, name="tts-warmup").start()
 
     logger.info(f"TTS: ElevenLabs ({eleven.model}, voice {voice_id[:8]}...) "
                 "with system-voice fallback")

@@ -17,7 +17,27 @@ class MusicSkill(Skill):
         if not any(w in low for w in ["play", "music", "song", "track", "playlist", "pause", "next", "previous", "skip"]):
             return None
 
-        # Playback controls
+        # Playback controls.
+        #
+        # These used to require "music"/"song"/"track"/"spotify" alongside the
+        # verb, so a bare "pause" — which is what anyone actually says once
+        # something is playing — matched nothing at all.
+        bare = low.strip(" .!?,")
+
+        if bare in {"pause", "pause it", "stop", "stop it", "stop the music",
+                    "shut up", "quiet", "hold on"}:
+            return SkillMatch(confidence=0.95, entities={"action": "pause"})
+        if bare in {"play", "resume", "resume it", "play it", "continue",
+                    "carry on", "keep playing", "unpause"}:
+            return SkillMatch(confidence=0.95, entities={"action": "resume"})
+        if bare in {"next", "skip", "next one", "skip it", "skip this"}:
+            return SkillMatch(confidence=0.95, entities={"action": "next"})
+        if bare in {"previous", "back", "go back", "previous one", "last one"}:
+            return SkillMatch(confidence=0.95, entities={"action": "previous"})
+        if bare in {"what's playing", "whats playing", "what is playing",
+                    "what song is this", "what is this song", "now playing"}:
+            return SkillMatch(confidence=0.95, entities={"action": "current"})
+
         if "pause" in low and any(w in low for w in ["music", "song", "track", "spotify"]):
             return SkillMatch(confidence=0.93, entities={"action": "pause"})
         if "resume" in low and any(w in low for w in ["music", "song", "track", "spotify"]):
@@ -29,10 +49,15 @@ class MusicSkill(Skill):
         if re.search(r"previous\s+(song|track)|last\s+song", low):
             return SkillMatch(confidence=0.93, entities={"action": "previous"})
 
+        # `bare`, not `low`. The trailing-platform group is anchored to $, so
+        # a question mark after "spotify" stopped it matching — and because the
+        # group is optional, the lazy (.+?) then swallowed the lot. "play Lose
+        # My Mind on Spotify?" searched Spotify for the literal string
+        # "lose my mind on spotify?", which of course found nothing.
         m = re.search(
             r"play\s+(?:some\s+)?(?:music\s+by\s+|song\s+)?(.+?)"
             r"(?:\s+(?:on|in)\s+(?:spotify|music|apple\s+music))?$",
-            low,
+            bare,
         )
         if m:
             item = m.group(1).strip()
@@ -55,6 +80,12 @@ class MusicSkill(Skill):
         )
 
         action = entities.get("action")
+        if action == "current":
+            from automation.music_control import get_current_track
+            now = await run_in_thread(get_current_track)
+            return SkillResult(
+                text=f"That's {now}." if now else "Nothing's playing right now.")
+
         if action == "pause":
             ok = await run_in_thread(pause_spotify)
             return SkillResult(text="Music paused." if ok else "Failed to pause.")
@@ -74,4 +105,10 @@ class MusicSkill(Skill):
             if result:
                 return SkillResult(text=f"Playing {result} on Spotify.")
             return SkillResult(text="Playing music on Spotify.")
+        # Not playing. If we have the query back, Spotify's search is open at
+        # it — say that plainly instead of claiming to be playing something.
+        if result:
+            return SkillResult(
+                text=f"I opened a search for {result} in Spotify, but couldn't "
+                     "start it automatically.")
         return SkillResult(text="Failed to play music.")

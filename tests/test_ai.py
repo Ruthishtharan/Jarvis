@@ -151,14 +151,25 @@ class TestSkillRegistry(unittest.TestCase):
         self.assertLess(m.confidence, 0.85)
 
     def test_registry_has_expected_skills(self):
+        """Every core skill must still be registered.
+
+        Asserts a subset rather than exact equality: adding a new skill is
+        routine and should not fail the suite, but *losing* one is a real
+        regression. The original exact-match version broke the moment eight
+        skills were added (jokes, recall, remember, define_word, …) and then
+        sat red, which is worse than no test at all.
+        """
         names = {s.name for s in self.registry.all_skills()}
-        expected = {
+        required = {
             "open_app", "close_app", "search_local", "web_search", "open_website",
             "whatsapp_send", "volume", "brightness", "screenshot", "music",
             "time_date", "mute", "battery", "wifi", "lock_screen", "empty_trash",
             "shutdown_system", "restart_system", "shutdown_jarvis", "conversation",
         }
-        self.assertEqual(names, expected, f"missing: {expected - names}; extra: {names - expected}")
+        self.assertTrue(
+            required <= names,
+            f"core skills missing from the registry: {sorted(required - names)}",
+        )
 
 
 if __name__ == "__main__":

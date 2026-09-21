@@ -29,6 +29,13 @@ _PATTERNS = [
     re.compile(r"(?:look up|spell out)\s+([a-z\-']+)\s+in the dictionary"),
 ]
 
+# Subjects that make "the meaning of X" a philosophical question rather than
+# a dictionary lookup. Kept deliberately tiny — this is an idiom guard, not a
+# general disambiguator.
+_IDIOMATIC_SUBJECTS = {
+    "life", "it", "this", "that", "all", "everything", "existence", "nothing",
+}
+
 
 class DefineWordSkill(Skill):
     name = "define_word"
@@ -39,12 +46,21 @@ class DefineWordSkill(Skill):
 
     def match(self, text: str) -> SkillMatch | None:
         low = text.lower().strip(" ?.!")
-        for pat in _PATTERNS:
+        for i, pat in enumerate(_PATTERNS):
             m = pat.search(low)
-            if m:
-                word = m.group(1).strip()
-                if len(word) > 1:
-                    return SkillMatch(confidence=0.94, entities={"word": word})
+            if not m:
+                continue
+            word = m.group(1).strip()
+            if len(word) <= 1:
+                continue
+            # "what is the meaning of life" parses as a lookup but never is
+            # one. Reciting the dictionary entry for "life" is a worse answer
+            # than talking about it, so hand these to the conversation skill.
+            # Only guards "meaning of" — "definition of life" is still a
+            # legitimate lexical request.
+            if i == 0 and "meaning of" in low and word in _IDIOMATIC_SUBJECTS:
+                return None
+            return SkillMatch(confidence=0.94, entities={"word": word})
         return None
 
     async def run(self, text: str, entities: dict) -> SkillResult:

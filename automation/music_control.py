@@ -83,39 +83,95 @@ def _resume_spotify() -> tuple[bool, str]:
     return ok, ""
 
 
+def find_track_uri(query: str) -> str:
+    """Resolve a song name to a `spotify:track:...` URI.
+
+    Spotify's Web API would be cleaner but needs registered credentials. Track
+    pages are public and indexed, so a web search for the open.spotify.com URL
+    gets the same ID with nothing to configure.
+
+    Uses `ddgs` — the same library research/engines.py searches with. The
+    previous version POSTed to html.duckduckgo.com directly and had silently
+    stopped working: DuckDuckGo now answers that endpoint with an anti-bot
+    challenge page, and it returns **HTTP 202**. `raise_for_status()` treats
+    202 as success, so the code happily regexed a page with no results in it
+    and returned "" every single time. Every "play <song>" therefore fell
+    through to merely opening the search pane.
+    """
+    import re as _re
+
+    try:
+        from ddgs import DDGS
+    except ImportError:
+        logger.debug("ddgs not installed — cannot resolve track URI")
+        return ""
+
+    pattern = _re.compile(r"open\.spotify\.com/track/([A-Za-z0-9]{22})")
+    wanted = set(_re.findall(r"[a-z0-9]+", query.lower()))
+
+    # Rank rather than taking result one. Searching "bohemian rhapsody"
+    # returned a live recording of "Now I'm Here" first — same artist, wrong
+    # song — because the first hit is whatever the engine ranked, not whatever
+    # matches the title. Scoring on how much of the query appears in the
+    # result title fixes that with no extra request.
+    best, best_score = "", -1.0
+    try:
+        with DDGS() as d:
+            for r in d.text(f"{query} site:open.spotify.com/track", max_results=8):
+                m = (pattern.search(r.get("href", "") or "")
+                     or pattern.search(r.get("body", "") or ""))
+                if not m:
+                    continue
+                title = (r.get("title", "") or "").lower()
+                # Spotify titles read "Song - song and lyrics by Artist | Spotify";
+                # everything from the dash on is boilerplate, not the song name.
+                head = set(_re.findall(r"[a-z0-9]+", title.split(" - ")[0]))
+                score = len(wanted & head) / max(len(wanted), 1)
+                if score > best_score:
+                    best, best_score = f"spotify:track:{m.group(1)}", score
+                if best_score == 1.0:      # every query word present — done
+                    break
+    except Exception as exc:
+        logger.debug(f"track lookup failed: {exc}")
+    return best
+
+
 def _search_and_play(query: str) -> tuple[bool, str]:
-    logger.info(f"Spotify search: {query!r}")
+    """Play a specific song.
 
-    # Open Spotify's built-in search via URI scheme
-    encoded = urllib.parse.quote(query)
-    subprocess.run(["open", f"spotify:search:{encoded}"])
-    time.sleep(2.5)
+    The previous version opened a search and fired blind arrow-key presses at
+    the window, hoping row one was a track. That depends on Spotify's layout,
+    on the window having focus, and on a fixed delay being long enough — so it
+    reliably searched and unreliably played.
 
-    # Best-effort: navigate to first result with keyboard and press Enter
-    nav_script = '''
-    tell application "Spotify" to activate
-    delay 0.6
-    tell application "System Events"
-        tell process "Spotify"
-            -- Down arrow highlights the first song row; Return plays it
-            key code 125
-            delay 0.25
-            key code 36
-        end tell
-    end tell
-    '''
-    _run_as(nav_script)
+    Resolving the track URI first removes all of that: AppleScript plays an
+    exact track, no UI scripting involved.
+    """
+    logger.info(f"Spotify: {query!r}")
 
-    # Verify something is actually playing
-    time.sleep(1.0)
-    now_playing = get_current_track()
-    if now_playing:
-        logger.info(f"Now playing: {now_playing}")
-        return True, now_playing
+    uri = find_track_uri(query)
+    if uri:
+        ok, _ = _run_as(f'tell application "Spotify" to play track "{uri}"')
+        if ok:
+            time.sleep(0.9)
+            now = get_current_track()
+            logger.info(f"Now playing: {now or uri}")
+            return True, now or query
 
-    # Search results are at least visible in Spotify even if auto-play failed
-    logger.info("Auto-play attempt done — Spotify is showing results.")
-    return True, query
+    # No URI, or AppleScript refused — fall back to showing the search so the
+    # request is at least one click from done.
+    logger.info("falling back to in-app search")
+    subprocess.run(["open", f"spotify:search:{urllib.parse.quote(query)}"])
+    time.sleep(1.5)
+    now = get_current_track()
+    if now:
+        return True, now
+    # Search is open but nothing is playing. This used to return True with the
+    # apology packed into the message, so the caller dutifully wrapped it:
+    # "Playing <song> - search is open in Spotify, but I couldn't start it on
+    # Spotify." Success and failure have to be distinguishable by the flag, not
+    # by reading the string — the caller cannot phrase it correctly otherwise.
+    return False, query
 
 
 def _run_as(script: str) -> tuple[bool, str]:
