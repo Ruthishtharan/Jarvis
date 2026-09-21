@@ -58,3 +58,4 @@ Thumbs.db
 data/*.tmp
 data/tts_cache/
 data/tts_web_cache/
+.env
